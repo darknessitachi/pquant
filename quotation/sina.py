@@ -1,22 +1,19 @@
-from quotation import BaseQuotation
 import re
+from .BasicQuotation import BasicQuotation
 
-
-class Sina(BaseQuotation):
+class Sina(BasicQuotation):
     __url = 'http://hq.sinajs.cn/?format=text&list='
     __grep_detail = re.compile(r'(\d+)=([^\s][^,]+?)%s%s' % (r',([\.\d]+)' * 29, r',([-\.\d:]+)' * 2))
 
-    def __init__(self, stocks):
-        super(Sina, self).__init__(self.__url, stocks)
+    def __init__(self):
+        super(Sina, self).__init__(self.__url)
 
-    def convertRequestParams(self, stockCodes):
-        params = {
-            'format': 'text',
-            'list': ','.join(stockCodes)
-        }
-        return [params]
+    def _convertRequestParams(self, stockCodes):
+        result = self.__resolveStockCodes(stockCodes)
+        return ','.join(result)
 
-    def resolveStockCodes(self, stockCodes):
+    @staticmethod
+    def __resolveStockCodes(stockCodes):
         """判断股票ID对应的证券市场
         匹配规则
         ['50', '51', '60', '90', '110'] 为 sh
@@ -39,9 +36,9 @@ class Sina(BaseQuotation):
             result.append('sz' + code)
         return result
 
-    def formatResponseData(self, responseData):
-        stocksDetail = ''.join(responseData)
-        result = self.__grep_detail.finditer(stocksDetail)
+    def _formatResponseData(self, param, responseData, encoding):
+        stockStr = str(responseData,encoding)
+        result = self.__grep_detail.finditer(stockStr)
         stock_dict = dict()
         for stock_match_object in result:
             stock = stock_match_object.groups()
@@ -83,5 +80,6 @@ class Sina(BaseQuotation):
 
 
 if __name__ == '__main__':
-    quotation = Sina(['601717', '600315'])
+    quotation = Sina()
+    quotation.subscribe('600887')
     print(quotation.getQuotationData())

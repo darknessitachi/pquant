@@ -4,35 +4,38 @@ import requests
 from abc import abstractmethod
 
 
-class BaseQuotation:
-    __url = None
-    __stocks = list()
-    max_num = 800
-
-    def __init__(self, url, stocks):
+class BasicQuotation:
+    def __init__(self, url):
+        self.__stocks = list()
         self.__url = url
-        self.__stocks = stocks
-        self._session = None
+        self._session = requests.session()
 
-    def addStock(self, stockCode):
-        self.__stocks.append(stockCode)
+    def subscribe(self, stockCode):
+        if not self.__stocks.count(stockCode):
+            self.__stocks.append(stockCode)
 
-    def removeStock(self, stockCode):
-        self.__stocks.remove(stockCode)
+    def unsubscribe(self, stockCode):
+        if self.__stocks.count(stockCode):
+            self.__stocks.remove(stockCode)
+
+    @property
+    def subscribed(self):
+        return self.__stocks
 
     def getQuotationData(self):
         """
             行情数据
         :return: dict
         """
-        self._session = requests.session()
+        if not self.__stocks:
+            print('未订阅任何股票行情！')
+            return {}
         tasks = []
-        stacks = self.resolveStockCodes(self.__stocks)
-        params = self.convertRequestParams(stacks)
+        params = self._convertRequestParams(self.__stocks)
         if type(params) is not list:
             params = [params]
         for param in params:
-            task = self.awaitResponseData(param=param)
+            task = self.__getResponseData(param=param)
             tasks.append(task)
         try:
             eventLoop = asyncio.get_event_loop()
@@ -40,41 +43,21 @@ class BaseQuotation:
             eventLoop = asyncio.new_event_loop()
             asyncio.set_event_loop(eventLoop)
         responseContent = eventLoop.run_until_complete(asyncio.gather(*tasks))
-        return self.formatResponseData(responseContent)
+        return responseContent
 
-    async def awaitResponseData(self, param):
-        content, encoding = await self.getResponseData(param)
-        return str(content, encoding=encoding)
-
-    async def getResponseData(self, param):
+    async def __getResponseData(self, param):
         headers = {
             'Accept-Encoding': 'gzip'
         }
-        response = requests.get(self.__url, params=param, timeout=5, headers=headers)
-        print(response.url)
-        return response.content, response.encoding
-        # async with self._session.get(self.__url + param, timeout=5, headers=headers) as r:
-        #     response_text = await r.content
-        #     return response_text
+        response = self._session.get(self.__url + param, timeout=5, headers=headers)
+        return self._formatResponseData(param, response.content, response.encoding)
 
     @abstractmethod
-    def convertRequestParams(self, stockCodes):
-        pass
+    def _convertRequestParams(self, stockCodes):
+        return stockCodes
 
     @abstractmethod
-    def resolveStockCodes(self, stockCodes):
-        """
-            解析标的代码到对应行情提供商的代码,需要子类实现
-            如：
-            股票代码        新浪          腾讯
-            600887      sh600887       s600887
-        :param stockCodes: 标的代码list
-        :return: 返回股票编码列表['sh600887','sh601717']
-        """
-        pass
-
-    @abstractmethod
-    def formatResponseData(self, response):
+    def _formatResponseData(self, param, response, encoding):
         """
             解析返回结果
         :param response: 返回结果字符串
