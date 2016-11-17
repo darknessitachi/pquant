@@ -1,5 +1,5 @@
 import re
-from .BasicQuotation import BasicQuotation
+from .basicquotation import BasicQuotation
 
 class Sina(BasicQuotation):
     __url = 'http://hq.sinajs.cn/?format=text&list='

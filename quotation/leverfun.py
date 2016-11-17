@@ -1,4 +1,4 @@
-from .BasicQuotation import BasicQuotation
+from .basicquotation import BasicQuotation
 import json
 
 
