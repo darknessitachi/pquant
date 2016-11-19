@@ -1,8 +1,8 @@
-from .basicquotation import BasicQuotation
+from . import basicquotation
 import json
 
 
-class Leverfun(BasicQuotation):
+class Leverfun(basicquotation):
     __url = 'https://app.leverfun.com/timelyInfo/timelyOrderForm?stockCode='
 
     def __init__(self):

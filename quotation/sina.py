@@ -1,7 +1,8 @@
 import re
-from .basicquotation import BasicQuotation
+from . import basicquotation
 
-class Sina(BasicQuotation):
+
+class Sina(basicquotation):
     __url = 'http://hq.sinajs.cn/?format=text&list='
     __grep_detail = re.compile(r'(\d+)=([^\s][^,]+?)%s%s' % (r',([\.\d]+)' * 29, r',([-\.\d:]+)' * 2))
 
@@ -21,7 +22,8 @@ class Sina(BasicQuotation):
         ['5', '6', '9'] 开头的为 sh， 其余为 sz
         :param stockCodes:股票ID, 若以 'sz', 'sh' 开头直接返回对应类型，否则使用内置规则判断
         :return 'sh' or 'sz'"""
-        if type(stockCodes) is not list: stockCodes = [stockCodes]
+        if type(stockCodes) is not list:
+            stockCodes = [stockCodes]
         result = list()
         for code in stockCodes:
             assert type(code) is str, 'stock code need str type'
@@ -37,7 +39,7 @@ class Sina(BasicQuotation):
         return result
 
     def _formatResponseData(self, param, responseData, encoding):
-        stockStr = str(responseData,encoding)
+        stockStr = str(responseData, encoding)
         result = self.__grep_detail.finditer(stockStr)
         stock_dict = dict()
         for stock_match_object in result:
