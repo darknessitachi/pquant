@@ -10,13 +10,13 @@ class BasicQuotation:
         self.__url = url
         self._session = requests.session()
 
-    def subscribe(self, stockCode):
-        if not self.__stocks.count(stockCode):
-            self.__stocks.append(stockCode)
+    def subscribe(self, code):
+        if not self.__stocks.count(code):
+            self.__stocks.append(code)
 
-    def unsubscribe(self, stockCode):
-        if self.__stocks.count(stockCode):
-            self.__stocks.remove(stockCode)
+    def unsubscribe(self, code):
+        if self.__stocks.count(code):
+            self.__stocks.remove(code)
 
     @property
     def subscribed(self):
@@ -38,12 +38,12 @@ class BasicQuotation:
             task = self.__getResponseData(param=param)
             tasks.append(task)
         try:
-            eventLoop = asyncio.get_event_loop()
+            loop = asyncio.get_event_loop()
         except RuntimeError:
-            eventLoop = asyncio.new_event_loop()
-            asyncio.set_event_loop(eventLoop)
-        responseContent = eventLoop.run_until_complete(asyncio.gather(*tasks))
-        return responseContent
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        content = loop.run_until_complete(asyncio.gather(*tasks))
+        return content
 
     async def __getResponseData(self, param):
         headers = {
@@ -53,8 +53,8 @@ class BasicQuotation:
         return self._formatResponseData(param, response.content, response.encoding)
 
     @abstractmethod
-    def _convertRequestParams(self, stockCodes):
-        return stockCodes
+    def _convertRequestParams(self, codes):
+        return codes
 
     @abstractmethod
     def _formatResponseData(self, param, response, encoding):
