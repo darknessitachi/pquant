@@ -11,6 +11,7 @@ import uuid
 
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
+from trade.thirdlibrary.yjb_captcha import YJBCaptcha
 
 from .log import log
 
@@ -92,8 +93,12 @@ def detect_ht_result(image_path):
 
 
 def detect_yjb_result(image_path):
-    code = detect_verify_code_by_java(image_path, 'yjb')
+    captcha = YJBCaptcha(imagePath=image_path)
+    code = captcha.string()
+    # code = detect_verify_code_by_java(image_path, 'yjb')
     if not code:
+        code = detect_verify_code_by_java(image_path, 'yjb')
+    elif not code:
         return default_verify_code_detect(image_path)
     return code
 

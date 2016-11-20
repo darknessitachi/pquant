@@ -1,6 +1,7 @@
 from .sina import Sina
 from .leverfun import Leverfun
 
+
 def use(source=None):
     if source in ['sina']:
         return Sina()

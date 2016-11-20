@@ -1,15 +1,15 @@
-from . import basicquotation
+from quotation.basicquotation import BasicQuotation
 import json
 
 
-class Leverfun(basicquotation):
+class Leverfun(BasicQuotation):
     __url = 'https://app.leverfun.com/timelyInfo/timelyOrderForm?stockCode='
 
     def __init__(self):
         super(Leverfun, self).__init__(self.__url)
 
     def _formatResponseData(self, param, response_data, encoding):
-        stockJson = json.loads(str(response_data,encoding))['data']
+        stockJson = json.loads(str(response_data, encoding))['data']
         buys = stockJson['buyPankou']
         sells = stockJson['sellPankou']
         stock_detail = dict(
@@ -26,6 +26,7 @@ class Leverfun(basicquotation):
         stock_dict = dict()
         stock_dict[param] = stock_detail
         return stock_dict
+
 
 if __name__ == '__main__':
     lf = Leverfun()

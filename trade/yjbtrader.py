@@ -5,7 +5,7 @@ import json
 import os
 import random
 import tempfile
-import urllib
+import urllib.parse
 
 import demjson
 import requests

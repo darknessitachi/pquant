@@ -1,20 +1,20 @@
 import re
-from . import basicquotation
+from quotation.basicquotation import BasicQuotation
 
 
-class Sina(basicquotation):
+class Sina(BasicQuotation):
     __url = 'http://hq.sinajs.cn/?format=text&list='
     __grep_detail = re.compile(r'(\d+)=([^\s][^,]+?)%s%s' % (r',([\.\d]+)' * 29, r',([-\.\d:]+)' * 2))
 
     def __init__(self):
         super(Sina, self).__init__(self.__url)
 
-    def _convertRequestParams(self, stockCodes):
-        result = self.__resolveStockCodes(stockCodes)
+    def _convertRequestParams(self, codes):
+        result = self.__resolveStockCodes(codes)
         return ','.join(result)
 
     @staticmethod
-    def __resolveStockCodes(stockCodes):
+    def __resolveStockCodes(codes):
         """判断股票ID对应的证券市场
         匹配规则
         ['50', '51', '60', '90', '110'] 为 sh
@@ -22,10 +22,10 @@ class Sina(basicquotation):
         ['5', '6', '9'] 开头的为 sh， 其余为 sz
         :param stockCodes:股票ID, 若以 'sz', 'sh' 开头直接返回对应类型，否则使用内置规则判断
         :return 'sh' or 'sz'"""
-        if type(stockCodes) is not list:
-            stockCodes = [stockCodes]
+        if type(codes) is not list:
+            codes = [codes]
         result = list()
-        for code in stockCodes:
+        for code in codes:
             assert type(code) is str, 'stock code need str type'
             if code.startswith(('sh', 'sz')):
                 result.append(code)
