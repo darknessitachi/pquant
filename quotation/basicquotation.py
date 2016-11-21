@@ -4,7 +4,7 @@ import requests
 from abc import abstractmethod
 import logging
 import time
-
+import math
 
 class BasicQuotation:
     def __init__(self, url):
@@ -13,7 +13,7 @@ class BasicQuotation:
         self._session = requests.session()
         logging.basicConfig(level='INFO', format='[%(asctime)s] [%(levelname)s] %(name)s:%(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S')
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger('quotation')
 
     def subscribe(self, code):
         if not self.__stocks.count(code):
@@ -52,7 +52,7 @@ class BasicQuotation:
             asyncio.set_event_loop(loop)
         content = loop.run_until_complete(asyncio.gather(*tasks))
         end = time.time()
-        self.log.info('行情刷新完毕，耗时{}s'.format(end - start))
+        self.log.info('行情刷新完毕，耗时{}ms'.format(math.ceil((end - start)*1000)))
         return content
 
     async def __getResponseData(self, param):
