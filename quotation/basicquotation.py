@@ -2,6 +2,8 @@ import asyncio
 
 import requests
 from abc import abstractmethod
+import logging
+import time
 
 
 class BasicQuotation:
@@ -9,13 +11,18 @@ class BasicQuotation:
         self.__stocks = list()
         self.__url = url
         self._session = requests.session()
+        logging.basicConfig(level='INFO', format='[%(asctime)s] [%(levelname)s] %(name)s:%(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S')
+        self.log = logging.getLogger(__name__)
 
     def subscribe(self, code):
         if not self.__stocks.count(code):
+            self.log.info('[{}]已添加到订阅列表.'.format(code))
             self.__stocks.append(code)
 
     def unsubscribe(self, code):
         if self.__stocks.count(code):
+            self.log.info('[{}]已从订阅列表中移除.'.format(code))
             self.__stocks.remove(code)
 
     @property
@@ -27,6 +34,7 @@ class BasicQuotation:
             行情数据
         :return: dict
         """
+        start = time.time()
         if not self.__stocks:
             print('未订阅任何股票行情！')
             return {}
@@ -43,14 +51,21 @@ class BasicQuotation:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         content = loop.run_until_complete(asyncio.gather(*tasks))
+        end = time.time()
+        self.log.info('行情刷新完毕，耗时{}s'.format(end - start))
         return content
 
     async def __getResponseData(self, param):
         headers = {
             'Accept-Encoding': 'gzip'
         }
-        response = self._session.get(self.__url + param, timeout=5, headers=headers)
-        return self._formatResponseData(param, response.content, response.encoding)
+        url = self.__url + param
+        response = self._session.get(url, timeout=5, headers=headers)
+        if response.status_code != 200:
+            self.log.error('{} BAD RESPONSE: {}'.format(url, response.status_code))
+            return
+        response_content = response.content
+        return self._formatResponseData(param, response_content, response.encoding)
 
     @abstractmethod
     def _convertRequestParams(self, codes):
