@@ -3,6 +3,7 @@ from quotation.basicquotation import BasicQuotation
 from utils.stockutil import get_stock_type
 import logging
 
+
 class Sina(BasicQuotation):
     __crawl_api = 'http://hq.sinajs.cn/?format=text&list='
     __grep_detail = re.compile(r'(\d+)=([^\s][^,]+?)%s%s' % (r',([\.\d]+)' * 29, r',([-\.\d:]+)' * 2))

@@ -1,10 +1,8 @@
 import asyncio
-
 import aiohttp
 import logging
 import time
 import math
-
 
 
 class BasicQuotation:
@@ -49,8 +47,12 @@ class BasicQuotation:
             return {}
         loop = asyncio.get_event_loop()
         future = asyncio.ensure_future(self._run(loop))
-        result = loop.run_until_complete(future)
+        content = loop.run_until_complete(future)
         end = time.time()
+        result = dict()
+        for i in content:
+            for j in i.keys():
+                result.__setitem__(j,i.get(j))
         self.log.info('行情刷新完毕，耗时{}ms'.format(math.ceil((end - start) * 1000)))
         return result
 
@@ -64,12 +66,14 @@ class BasicQuotation:
             行情数据
         :return: dict
         """
+
         def task_completed(future):
             # This function should never be called in right case.
             # The only reason why it is invoking is uncaught exception.
             exc = future.exception()
             if exc:
                 self.log.error('Worker has finished with error: {} '.format(exc), exc_info=True)
+
         tasks = []
         for stock in self.__stocks:
             crawl_url = self._curl_handle(self.__crawl_api, stock)
@@ -99,8 +103,8 @@ if __name__ == '__main__':
     q.subscribe('600887')
     q.subscribe('600315')
     q.subscribe(['000001', '000002', '000003'])
-    print(q.subscribed)
+    # print(q.subscribed)
     q.refresh()
     q.unsubscribe(['601717', '000003', ''])
-    print(q.subscribed)
+    # print(q.subscribed)
     q.refresh()
