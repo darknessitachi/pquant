@@ -1,46 +1,22 @@
 import re
 from quotation.basicquotation import BasicQuotation
-
+from utils.stockutil import get_stock_type
+import logging
 
 class Sina(BasicQuotation):
-    __url = 'http://hq.sinajs.cn/?format=text&list='
+    __crawl_api = 'http://hq.sinajs.cn/?format=text&list='
     __grep_detail = re.compile(r'(\d+)=([^\s][^,]+?)%s%s' % (r',([\.\d]+)' * 29, r',([-\.\d:]+)' * 2))
 
     def __init__(self):
-        super(Sina, self).__init__(self.__url)
+        super(Sina, self).__init__(self.__crawl_api)
+        self.log = logging.getLogger("sina")
 
-    def _convertRequestParams(self, codes):
-        result = self.__resolveStockCodes(codes)
-        return ','.join(result)
+    def _curl_handle(self, crawl_api, param):
+        result = get_stock_type(param) + param
+        return crawl_api + result
 
-    @staticmethod
-    def __resolveStockCodes(codes):
-        """判断股票ID对应的证券市场
-        匹配规则
-        ['50', '51', '60', '90', '110'] 为 sh
-        ['00', '13', '18', '15', '16', '18', '20', '30', '39', '115'] 为 sz
-        ['5', '6', '9'] 开头的为 sh， 其余为 sz
-        :param stockCodes:股票ID, 若以 'sz', 'sh' 开头直接返回对应类型，否则使用内置规则判断
-        :return 'sh' or 'sz'"""
-        if type(codes) is not list:
-            codes = [codes]
-        result = list()
-        for code in codes:
-            assert type(code) is str, 'stock code need str type'
-            if code.startswith(('sh', 'sz')):
-                result.append(code)
-            if code.startswith(('50', '51', '60', '90', '110', '113', '132', '204')):
-                result.append('sh' + code)
-            if code.startswith(('00', '13', '18', '15', '16', '18', '20', '30', '39', '115', '1318')):
-                result.append('sz' + code)
-            if code.startswith(('5', '6', '9')):
-                result.append('sh' + code)
-            result.append('sz' + code)
-        return result
-
-    def _formatResponseData(self, param, responseData, encoding):
-        stockStr = str(responseData, encoding)
-        result = self.__grep_detail.finditer(stockStr)
+    def _format_response(self, response, stock):
+        result = self.__grep_detail.finditer(response)
         stock_dict = dict()
         for stock_match_object in result:
             stock = stock_match_object.groups()
@@ -82,6 +58,7 @@ class Sina(BasicQuotation):
 
 
 if __name__ == '__main__':
-    quotation = Sina()
-    quotation.subscribe('600887')
-    print(quotation.getQuotationData())
+    from pprint import pprint
+    q = Sina()
+    q.subscribe('600887')
+    pprint(q.refresh())
