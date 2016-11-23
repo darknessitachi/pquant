@@ -1,12 +1,16 @@
 # coding: utf-8
 import logging
-import os
 import re
+import os
 import time
+import ssl
 from threading import Thread
+import utils.stockutil as sutils
+import utils.commutil as cutils
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.poolmanager import PoolManager
 
-from . import helpers
-from .log import log
 
 class LoginError(Exception):
     def __init__(self, message=None):
@@ -20,33 +24,59 @@ class TradeError(Exception):
         self.message = message
 
 
-class BasicTrader(object):
-    global_config_path = os.path.dirname(__file__) + '/config/global.json'
-    config_path = ''
-
+class Ssl3HttpAdapter(HTTPAdapter):
     def __init__(self):
-        self.__read_config()
-        self.trade_prefix = self.config['prefix']
-        self.account_config = ''
-        self.heart_active = True
-        self.heart_thread = Thread(target=self.send_heartbeat)
-        self.heart_thread.setDaemon(True)
+        super(Ssl3HttpAdapter, self).__init__()
 
-    def read_config(self, path):
-        try:
-            self.account_config = helpers.file2dict(path)
-        except ValueError:
-            log.error('配置文件格式有误，请勿使用记事本编辑，推荐使用 notepad++ 或者 sublime text')
-        for v in self.account_config:
-            if type(v) is int:
-                log.warn('配置文件的值最好使用双引号包裹，使用字符串类型，否则可能导致不可知的问题')
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = PoolManager(num_pools=connections,
+                                       maxsize=maxsize,
+                                       block=block,
+                                       ssl_version=ssl.PROTOCOL_TLSv1)
 
-    def prepare(self, need_data):
-        """登录的统一接口
-        :param need_data 登录所需数据
-        """
-        self.read_config(need_data)
-        self.autologin()
+
+class BasicTrader(object):
+    __global_config_path = os.path.dirname(__file__) + '/config/global.json'
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6'
+    }
+
+    def __init__(self, account_filepath, api_filepath, auto_login=True, login_limit=10):
+        logging.basicConfig(level='INFO',
+                            format='[%(asctime)s] [%(levelname)s] %(name)s:%(message)s',
+                            datefmt='%Y-%m-%d %H:%M:%S')
+        self.log = logging.getLogger('trader')
+
+        self.httpClient = requests.session()
+        self.httpClient.mount('https://', Ssl3HttpAdapter())
+
+        self.__account_info = cutils.file2dict(path=account_filepath)
+
+        self.config = cutils.file2dict(path=api_filepath)
+        self.global_config = cutils.file2dict(self.__global_config_path)
+        self.config.update(self.global_config)
+
+        self.__heart_active = True
+        self.__heart_thread = Thread(target=self.__send_heartbeat)
+        self.__heart_thread.setDaemon(True)
+
+        if auto_login:
+            self.autologin(limit=login_limit)
+            self.__keepalive()
+
+    def _request(self, method, url, data=None, callback=None):
+        resp = self.httpClient.request(method=method.upper(), url=url, data=data, headers=self.headers)
+        if resp.status_code == 200:
+            self.log.debug(resp.headers)
+            if callback:
+                return callback(resp)
+            return resp
+        else:
+            self.log.error('{}:{}'.format(resp.status_code, url))
+            raise requests.RequestException('{}:{}'.format(resp.status_code, url))
 
     def autologin(self, limit=10):
         """实现自动登录
@@ -57,35 +87,10 @@ class BasicTrader(object):
                 break
         else:
             raise LoginError('登录失败次数过多, 请检查密码是否正确 / 券商服务器是否处于维护中 / 网络连接是否正常')
-        self.keepalive()
+        self.__keepalive()
 
     def login(self):
         pass
-
-    def keepalive(self):
-        """启动保持在线的进程 """
-        if self.heart_thread.is_alive():
-            self.heart_active = True
-        else:
-            self.heart_thread.start()
-
-    def send_heartbeat(self):
-        """每隔10秒查询指定接口保持 token 的有效性"""
-        while True:
-            if self.heart_active:
-                try:
-                    log_level = log.level
-
-                    log.setLevel(logging.ERROR)
-                    response = self.heartbeat()
-                    self.check_account_live(response)
-
-                    log.setLevel(log_level)
-                except:
-                    self.autologin()
-                time.sleep(30)
-            else:
-                time.sleep(1)
 
     def heartbeat(self):
         return self.balance
@@ -93,15 +98,34 @@ class BasicTrader(object):
     def check_account_live(self, response):
         pass
 
+    def __keepalive(self):
+        """启动保持在线的进程 """
+        if self.__heart_thread.is_alive():
+            self.__heart_active = True
+        else:
+            self.__heart_thread.start()
+
+    def __send_heartbeat(self):
+        """每隔10秒查询指定接口保持 token 的有效性"""
+        while True:
+            if self.__heart_active:
+                try:
+                    log_level = self.log.level
+
+                    self.log.setLevel(logging.ERROR)
+                    response = self.heartbeat()
+                    self.check_account_live(response)
+
+                    self.log.setLevel(log_level)
+                except:
+                    self.autologin()
+                time.sleep(30)
+            else:
+                time.sleep(1)
+
     def exit(self):
         """结束保持 token 在线的进程"""
-        self.heart_active = False
-
-    def __read_config(self):
-        """读取 config"""
-        self.config = helpers.file2dict(self.config_path)
-        self.global_config = helpers.file2dict(self.global_config_path)
-        self.config.update(self.global_config)
+        self.__heart_active = False
 
     @property
     def balance(self):
@@ -134,26 +158,7 @@ class BasicTrader(object):
     def get_current_deal(self):
         """获取当日委托列表"""
         # return self.do(self.config['current_deal'])
-        log.warning('目前仅在 佣金宝/银河子类 中实现, 其余券商需要补充')
-
-    @property
-    def exchangebill(self):
-        """
-        默认提供最近30天的交割单, 通常只能返回查询日期内最新的 90 天数据。
-        :return:
-        """
-        # TODO 目前仅在 华泰子类 中实现
-        start_date, end_date = helpers.get_30_date()
-        return self.get_exchangebill(start_date, end_date)
-
-    def get_exchangebill(self, start_date, end_date):
-        """
-        查询指定日期内的交割单
-        :param start_date: 20160211
-        :param end_date: 20160211
-        :return:
-        """
-        log.warning('目前仅在 华泰子类 中实现, 其余券商需要补充')
+        self.log.warning('目前仅在 佣金宝/银河子类 中实现, 其余券商需要补充')
 
     def get_ipo_limit(self, stock_code):
         """
@@ -161,7 +166,7 @@ class BasicTrader(object):
         :param stock_code: 申购代码 ID
         :return:
         """
-        log.warning('目前仅在 佣金宝子类 中实现, 其余券商需要补充')
+        self.log.warning('目前仅在 佣金宝子类 中实现, 其余券商需要补充')
 
     def do(self, params):
         """发起对 api 的请求并过滤返回结果
@@ -213,9 +218,9 @@ class BasicTrader(object):
             for key in item:
                 try:
                     if re.search(int_match_str, key) is not None:
-                        item[key] = helpers.str2num(item[key], 'int')
+                        item[key] = cutils.str2num(item[key], 'int')
                     elif re.search(float_match_str, key) is not None:
-                        item[key] = helpers.str2num(item[key], 'float')
+                        item[key] = cutils.str2num(item[key], 'float')
                 except ValueError:
                     continue
         return response_data

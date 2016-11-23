@@ -1,39 +1,29 @@
-# coding: utf-8
+#!/usr/bin/env python3
 from __future__ import division
-
 import json
 import os
 import random
 import tempfile
 import urllib.parse
-
 import demjson
-import requests
 
-from . import helpers
-from .log import log
-from .basictrader import LoginError
-from .basictrader import BasicTrader
+import utils.timeutil as tutils
+import utils.commutil as cutils
+import utils.stockutil as sutils
+from basictrader import LoginError
+from basictrader import BasicTrader
 
 
 class YJBTrader(BasicTrader):
     config_path = os.path.dirname(__file__) + '/config/yjb.json'
 
-    def __init__(self):
-        super(YJBTrader, self).__init__()
-        self.account_config = None
-        self.s = requests.session()
-        self.s.mount('https://', helpers.Ssl3HttpAdapter())
+    def __init__(self, account_filepath):
+        super(YJBTrader, self).__init__(account_filepath=account_filepath,
+                                        api_filepath=self.config_path)
 
     def login(self, throw=False):
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko'
-        }
-        self.s.headers.update(headers)
-
-        self.s.get(self.config['login_page'])
-
-        verify_code = self.handle_recognize_code()
+        self._request(method='get', url=self.config['login_page'])
+        verify_code = self.recognize_code()
         if not verify_code:
             return False
         login_status, result = self.post_login_data(verify_code)
@@ -41,23 +31,21 @@ class YJBTrader(BasicTrader):
             raise LoginError(result)
         return login_status
 
-    def handle_recognize_code(self):
+    def recognize_code(self):
         """获取并识别返回的验证码
         :return:失败返回 False 成功返回 验证码"""
         # 获取验证码
-        verify_code_response = self.s.get(self.config['verify_code_api'], params=dict(randomStamp=random.random()))
+        verify_code_response = self._request(method='get',
+                                             url=self.config['verify_code_api'],
+                                             data=dict(randomStamp=random.random()))
         # 保存验证码
         image_path = os.path.join(tempfile.gettempdir(), 'vcode_%d' % os.getpid())
         with open(image_path, 'wb') as f:
             f.write(verify_code_response.content)
 
-        verify_code = helpers.recognize_verify_code(image_path, 'yjb')
-        log.debug('verify code detect result: %s' % verify_code)
+        verify_code = sutils.verify_code(image_path, 'yjb')
+        self.log.debug('verify code detect result: %s' % verify_code)
         os.remove(image_path)
-
-        ht_verify_code_length = 4
-        if len(verify_code) != ht_verify_code_length:
-            return False
         return verify_code
 
     def post_login_data(self, verify_code):
@@ -65,13 +53,13 @@ class YJBTrader(BasicTrader):
         password = urllib.parse.unquote(self.account_config['password'])
         login_params = dict(
             self.config['login'],
-            mac_addr=helpers.get_mac(),
+            mac_addr=cutils.get_mac_address(),
             account_content=self.account_config['account'],
             password=password,
             validateCode=verify_code
         )
-        login_response = self.s.post(self.config['login_api'], params=login_params)
-        log.debug('login response: %s' % login_response.text)
+        login_response = self.httpClient.post(self.config['login_api'], params=login_params)
+        self.log.debug('login response: %s' % login_response.text)
 
         if login_response.text.find('上次登陆') != -1:
             return True, None
@@ -160,7 +148,7 @@ class YJBTrader(BasicTrader):
         )
         data = self.do(params)
         if 'error_no' in data.keys() and data['error_no'] != "0":
-            log.debug('查询错误: %s' % (data['error_info']))
+            self.log.debug('查询错误: %s' % (data['error_info']))
             return None
         return dict(high_amount=float(data['high_amount']), enable_amount=data['enable_amount'],
                     last_price=float(data['last_price']))
@@ -187,7 +175,7 @@ class YJBTrader(BasicTrader):
         # 获取股票对应的证券市场
         sh_exchange_type = 1
         sz_exchange_type = 2
-        exchange_type = sh_exchange_type if helpers.get_stock_type(stock_code) == 'sh' else sz_exchange_type
+        exchange_type = sh_exchange_type if sutils.get_stock_type(stock_code) == 'sh' else sz_exchange_type
         # 获取股票对应的证券帐号
         if not hasattr(self, 'exchange_stock_account'):
             self.exchange_stock_account = dict()
@@ -212,7 +200,7 @@ class YJBTrader(BasicTrader):
         return basic_params
 
     def request(self, params):
-        r = self.s.get(self.trade_prefix, params=params)
+        r = self.httpClient.get(self.trade_prefix, params=params)
         return r.text
 
     def format_response_data(self, data):
@@ -235,3 +223,8 @@ class YJBTrader(BasicTrader):
     def check_account_live(self, response):
         if hasattr(response, 'get') and response.get('error_no') == '-1':
             self.heart_active = False
+
+
+if __name__ == '__main__':
+    user = YJBTrader('yjb.json')
+    print(user.balance)

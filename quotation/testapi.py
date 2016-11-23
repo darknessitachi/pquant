@@ -11,5 +11,6 @@ if __name__ == '__main__':
     lf = quotation.use('lf')
     lf.subscribe('600887')
     lf.subscribe('601717')
+    lf.subscribe(['000001','000002'])
     pprint(lf.subscribed)
     pprint(lf.refresh())
