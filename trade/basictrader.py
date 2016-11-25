@@ -5,7 +5,7 @@ import os
 import time
 import ssl
 from threading import Thread
-import utils.stockutil as sutils
+import random
 import utils.commutil as cutils
 import requests
 from requests.adapters import HTTPAdapter
@@ -32,30 +32,33 @@ class Ssl3HttpAdapter(HTTPAdapter):
         self.poolmanager = PoolManager(num_pools=connections,
                                        maxsize=maxsize,
                                        block=block,
-                                       ssl_version=ssl.PROTOCOL_TLSv1)
+                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
 
 
 class BasicTrader(object):
     __global_config_path = os.path.dirname(__file__) + '/config/global.json'
 
-    headers = {
+    HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.8,en;q=0.6'
+        'Accept': 'text/html, application/xhtml+xml, */*',
+        'Accept-Language': 'zh-CN',
+        'Accept-Encoding': 'gzip, deflate'
     }
 
-    def __init__(self, account_filepath, api_filepath, auto_login=True, login_limit=10):
-        logging.basicConfig(level='INFO',
-                            format='[%(asctime)s] [%(levelname)s] %(name)s:%(message)s',
+    TRADE_DIRECTIVE = ['home', 'verifyCode', 'login', 'logout', 'buy', 'sell', 'balance', 'position',
+                       'entrust', 'ipo']
+    DEFAULT_METHOD = 'get'
+
+    def __init__(self, api_file):
+        logging.basicConfig(level='DEBUG',
+                            format='%(asctime)s [%(levelname)s] %(name)s: %(message)s ',
                             datefmt='%Y-%m-%d %H:%M:%S')
-        self.log = logging.getLogger('trader')
+        self.log = logging.getLogger('交易')
 
         self.httpClient = requests.session()
         self.httpClient.mount('https://', Ssl3HttpAdapter())
 
-        self.__account_info = cutils.file2dict(path=account_filepath)
-
-        self.config = cutils.file2dict(path=api_filepath)
+        self.config = cutils.file2dict(path=api_file)
         self.global_config = cutils.file2dict(self.__global_config_path)
         self.config.update(self.global_config)
 
@@ -63,20 +66,71 @@ class BasicTrader(object):
         self.__heart_thread = Thread(target=self.__send_heartbeat)
         self.__heart_thread.setDaemon(True)
 
-        if auto_login:
-            self.autologin(limit=login_limit)
-            self.__keepalive()
-
-    def _request(self, method, url, data=None, callback=None):
-        resp = self.httpClient.request(method=method.upper(), url=url, data=data, headers=self.headers)
+    # TODO 增加注解
+    def _request(self, request_api):
+        self.log.debug(
+            'url:{},params:{},data:{}'.format(request_api['url'], request_api['params'], request_api['data']))
+        resp = self.httpClient.request(method=request_api['method'],
+                                       url=request_api['url'],
+                                       params=request_api['params'],
+                                       data=request_api['data'],
+                                       headers=request_api['headers'])
         if resp.status_code == 200:
-            self.log.debug(resp.headers)
-            if callback:
-                return callback(resp)
+            self.log.debug('status:{},url:{}'.format(resp.status_code, request_api['url']))
             return resp
         else:
-            self.log.error('{}:{}'.format(resp.status_code, url))
-            raise requests.RequestException('{}:{}'.format(resp.status_code, url))
+            self.log.error(
+                'status:{},url:{},params:{},data:{},response_text:{}'.format(resp.status_code,
+                                                                             request_api['url'],
+                                                                             request_api['params'],
+                                                                             request_api['data'],
+                                                                             resp.text))
+            return False
+
+    def do(self, directive, params=None, data=None, callback=None, handle=None, add_basic_params=True):
+        """发起对 api 的请求并过滤返回结果
+        :param add_basic_params:
+        :param data:
+        :param directive:
+        :param callback:
+        :param handle:
+        :param params: 交易所需的动态参数"""
+        if not directive or type(directive) is not str or directive not in self.TRADE_DIRECTIVE:
+            raise TradeError("无效的交易指令")
+        request_api = self.__get_request_api(directive, params, data, add_basic_params)
+        resp = self._request(request_api)
+        if callback:
+            callback(resp)
+        if handle:
+            return handle(resp)
+        return resp.text
+
+    def __get_request_api(self, directive, params, data, add_basic_params):
+        basic = self.get_config('basic')
+        config_api = self.get_config(directive)
+
+        basic_params = basic['params']
+        cur_params_ = config_api['params'] if 'params' in config_api else {}
+        cur_params_ = self.__resolve_params(cur_params_)
+        if not params:
+            params = {}
+        if add_basic_params:
+            cur_params_ = cur_params_.update(basic_params)
+        cur_params_ = params.update(cur_params_)
+
+        if not data:
+            data = {}
+        data_ = config_api['data'] if 'data' in config_api else {}
+        data_ = data_.update(data)
+
+        request_api = dict(
+            method=config_api['method'] if 'method' in config_api else self.DEFAULT_METHOD,
+            url=config_api['api'] if 'api' in config_api else basic['api'],
+            params=cur_params_,
+            data=data_,
+            headers=config_api['headers'] if 'headers' in config_api else self.HEADERS
+        )
+        return request_api
 
     def autologin(self, limit=10):
         """实现自动登录
@@ -87,7 +141,7 @@ class BasicTrader(object):
                 break
         else:
             raise LoginError('登录失败次数过多, 请检查密码是否正确 / 券商服务器是否处于维护中 / 网络连接是否正常')
-        self.__keepalive()
+            # self.__keepalive()
 
     def login(self):
         pass
@@ -123,9 +177,10 @@ class BasicTrader(object):
             else:
                 time.sleep(1)
 
-    def exit(self):
+    def logout(self):
         """结束保持 token 在线的进程"""
         self.__heart_active = False
+        self.__heart_thread.join(timeout=10)
 
     @property
     def balance(self):
@@ -133,7 +188,7 @@ class BasicTrader(object):
 
     def get_balance(self):
         """获取账户资金状况"""
-        return self.do(self.config['balance'])
+        return self.do(params=self.config['balance'], callback=self.format_response_data)
 
     @property
     def position(self):
@@ -168,32 +223,25 @@ class BasicTrader(object):
         """
         self.log.warning('目前仅在 佣金宝子类 中实现, 其余券商需要补充')
 
-    def do(self, params):
-        """发起对 api 的请求并过滤返回结果
-        :param params: 交易所需的动态参数"""
-        request_params = self.create_basic_params()
-        request_params.update(params)
-        response_data = self.request(request_params)
+    def get_config(self, config_key):
+        result = {}
         try:
-            format_json_data = self.format_response_data(response_data)
-        except:
-            # Caused by server force logged out
-            return None
-        return_data = self.fix_error_data(format_json_data)
-        try:
-            self.check_login_status(return_data)
-        except LoginError:
-            self.autologin()
-        return return_data
+            return cutils.pathGet(self.config, config_key)
+        except KeyError:
+            return result
 
-    def create_basic_params(self):
-        """生成基本的参数"""
-        pass
-
-    def request(self, params):
-        """请求并获取 JSON 数据
-        :param params: Get 参数"""
-        pass
+    def __resolve_params(self, dict_):
+        result = {}
+        if type(dict_) is not dict:
+            return dict_
+        for key, val in dict_.items():
+            if type(val) is not dict:
+                result.setdefault(key,val)
+            elif 'eval' in val and 'formula' in val:
+                if val.get('eval'):
+                    result.setdefault(key, eval(val.get('formula')))
+                else:
+                    result.setdefault(key, val.get('formula'))
 
     def format_response_data(self, data):
         """格式化返回的 json 数据

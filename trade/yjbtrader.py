@@ -6,24 +6,25 @@ import random
 import tempfile
 import urllib.parse
 import demjson
-
-import utils.timeutil as tutils
 import utils.commutil as cutils
 import utils.stockutil as sutils
-from basictrader import LoginError
-from basictrader import BasicTrader
+from trade.basictrader import LoginError
+from trade.basictrader import BasicTrader
 
 
 class YJBTrader(BasicTrader):
-    config_path = os.path.dirname(__file__) + '/config/yjb.json'
+    api_file = os.path.dirname(__file__) + '/config/yjb.json'
 
     def __init__(self, account_filepath):
-        super(YJBTrader, self).__init__(account_filepath=account_filepath,
-                                        api_filepath=self.config_path)
+        super(YJBTrader, self).__init__(api_file=self.api_file)
+        self.CSRF_Token = 'undefined'
+        self.account_info = cutils.file2dict(path=account_filepath)
 
     def login(self, throw=False):
-        self._request(method='get', url=self.config['login_page'])
-        verify_code = self.recognize_code()
+        self.do(directive="home", add_basic_params=False)
+        verify_code = self.do(directive='verifyCode',
+                              handle=self.recognize_code,
+                              add_basic_params=False)
         if not verify_code:
             return False
         login_status, result = self.post_login_data(verify_code)
@@ -31,13 +32,14 @@ class YJBTrader(BasicTrader):
             raise LoginError(result)
         return login_status
 
-    def recognize_code(self):
+    def recognize_code(self, resp):
         """获取并识别返回的验证码
         :return:失败返回 False 成功返回 验证码"""
         # 获取验证码
         verify_code_response = self._request(method='get',
                                              url=self.config['verify_code_api'],
-                                             data=dict(randomStamp=random.random()))
+                                             data=dict(randomStamp=random.random()),
+                                             headers=dict(Accept='image/png, image/svg+xml, image/*;q=0.8, */*;q=0.5'))
         # 保存验证码
         image_path = os.path.join(tempfile.gettempdir(), 'vcode_%d' % os.getpid())
         with open(image_path, 'wb') as f:
@@ -50,20 +52,26 @@ class YJBTrader(BasicTrader):
 
     def post_login_data(self, verify_code):
 
-        password = urllib.parse.unquote(self.account_config['password'])
+        password = urllib.parse.unquote(self.account_info['password'])
         login_params = dict(
             self.config['login'],
             mac_addr=cutils.get_mac_address(),
-            account_content=self.account_config['account'],
+            account_content=self.account_info['account'],
             password=password,
             validateCode=verify_code
         )
-        login_response = self.httpClient.post(self.config['login_api'], params=login_params)
-        self.log.debug('login response: %s' % login_response.text)
+        login_response = self._request(method='post', url=self.config['login_api'], data=login_params)
 
-        if login_response.text.find('上次登陆') != -1:
-            return True, None
-        return False, login_response.text
+        if login_response:
+            self.log.debug('login response: %s' % login_response.text)
+            if login_response.text.find('上次登陆') != -1:
+                # msg = cutils.str2dict(json.loads(login_response.text)['returnJson'])
+                # self.CSRF_Token = msg['CSRF_Token']
+                return True, None
+            else:
+                return False, login_response.text
+        else:
+            return False, '网络异常'
 
     def cancel_entrust(self, entrust_no, stock_code):
         """撤单
@@ -155,7 +163,7 @@ class YJBTrader(BasicTrader):
 
     def __trade(self, stock_code, price, entrust_prop, other):
         # 检查是否已经掉线
-        if not self.heart_thread.is_alive():
+        if not self.__heart_thread.is_alive():
             check_data = self.get_balance()
             if type(check_data) == dict:
                 return check_data
@@ -192,20 +200,16 @@ class YJBTrader(BasicTrader):
             stock_account=self.exchange_stock_account[exchange_type]
         )
 
-    def create_basic_params(self):
-        basic_params = dict(
-            CSRF_Token='undefined',
-            timestamp=random.random(),
-        )
-        return basic_params
+    # def get_params(self):
+    #     basic_params = dict(
+    #         CSRF_Token='undefined',
+    #         timestamp=random.random(),
+    #     )
+    #     return basic_params
 
-    def request(self, params):
-        r = self.httpClient.get(self.trade_prefix, params=params)
-        return r.text
-
-    def format_response_data(self, data):
+    def format_response_data(self, response):
         # 获取 returnJSON
-        return_json = json.loads(data)['returnJson']
+        return_json = json.loads(response.text)['returnJson']
         raw_json_data = demjson.decode(return_json)
         fun_data = raw_json_data['Func%s' % raw_json_data['function_id']]
         header_index = 1
@@ -227,4 +231,5 @@ class YJBTrader(BasicTrader):
 
 if __name__ == '__main__':
     user = YJBTrader('yjb.json')
+    user.autologin(10)
     print(user.balance)

@@ -13,6 +13,32 @@ def str2num(num_str, convert_type='float'):
     return num if convert_type == 'float' else int(num)
 
 
+
+def pathGet(dictionary, path):
+    for item in path.split("/"):
+        dictionary = dictionary[item]
+    return dictionary
+
+def pathSet(dictionary, path, setItem):
+    path = path.split("/")
+    key = path[-1]
+    dictionary = pathGet(dictionary, "/".join(path[:-1]))
+    dictionary[key] = setItem
+
+
+def str2dict(str_):
+    """
+        str2dict
+    :param str_:
+    :return:
+    """
+    import demjson
+    # str_ = re.sub(r"\{\s*(\w)", r'{"\1', str_)
+    # str_ = re.sub(r"([\'\]\}]),\s*(\w)", r'\1,"\2', str_)
+    # str_ = re.sub(r"(\w):", r'\1":', str_)
+    # str_ = str_.replace("'", "\"")
+    return demjson.decode(str_)
+
 def show_image(image_path):
     """显示图片"""
     from PIL import Image

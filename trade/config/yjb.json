@@ -1,60 +1,116 @@
 {
-  "login_page": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/",
-  "login_api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/exchange.action",
-  "verify_code_api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/user/extraCode.jsp",
-  "prefix": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/stock/exchange.action",
-  "logout_api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/stock/exchange.action?function_id=20&login_type=stock",
+  "basic": {
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/stock/exchange.action",
+    "params": {
+      "CSRF_Token": "undefined",
+      "timestamp": {
+        "eval": true,
+        "formula": "random.random()"
+      }
+    }
+  },
+  "home": {
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/",
+    "params": {
+      "randomStamp": {
+        "eval": true,
+        "formula": "random.random()"
+      }
+    }
+  },
   "login": {
-    "function_id": 200,
-    "login_type": "stock",
-    "version": 200,
-    "identity_type": "",
-    "remember_me": "",
-    "input_content": 1,
-    "content_type": 0,
-    "loginPasswordType": "B64",
-    "disk_serial_id": "ST3250820AS",
-    "cpuid": "-41315-FA76141D",
-    "machinecode": "-41315-FA76141D"
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/exchange.action",
+    "method": "post",
+    "params": {
+      "function_id": 200,
+      "login_type": "stock",
+      "version": 200,
+      "identity_type": "",
+      "remember_me": "",
+      "input_content": 1,
+      "content_type": 0,
+      "loginPasswordType": "B64",
+      "disk_serial_id": "",
+      "cpuid": "-306A9-FFBA2203",
+      "machinecode": "-306A9-FFBA2203"
+    }
+  },
+  "logout": {
+    "params": {
+      "function_id": 20,
+      "login_type": "stock"
+    }
+  },
+  "verifyCode": {
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/user/extraCode.jsp",
+    "headers": {
+      "Accept": "image/png, image/svg+xml, image/*;q=0.8, */*;q=0.5"
+    },
+    "params": {
+      "randomStamp": {
+        "eval": true,
+        "formula": "random.random()"
+      }
+    }
   },
   "buy": {
-    "service_type": "stock",
-    "request_id": "buystock_302"
+    "params": {
+      "service_type": "stock",
+      "request_id": "buystock_302"
+    }
   },
   "sell": {
-    "service_type": "stock",
-    "request_id": "sellstock_302"
+    "params": {
+      "service_type": "stock",
+      "request_id": "sellstock_302"
+    }
   },
   "position": {
-    "request_id": "mystock_403"
+    "params": {
+      "request_id": "mystock_403"
+    }
   },
   "balance": {
-    "request_id": "mystock_405"
+    "params": {
+      "request_id": "mystock_405"
+    }
   },
   "entrust": {
-    "request_id": "trust_401",
-    "sort_direction": 1,
-    "deliver_type": "",
-    "service_type": "stock"
+    "params": {
+      "request_id": "trust_401",
+      "sort_direction": 1,
+      "deliver_type": "",
+      "service_type": "stock"
+    }
   },
   "cancel_entrust": {
-    "request_id": "chedan_304"
+    "params": {
+      "request_id": "chedan_304"
+    }
   },
   "current_deal": {
-    "request_id": "bargain_402",
-    "sort_direction": 1,
-    "service_type": "stock"
+    "params": {
+      "request_id": "bargain_402",
+      "sort_direction": 1,
+      "service_type": "stock"
+    }
   },
   "ipo_enable_amount": {
-    "request_id": "buystock_300"
+    "params": {
+      "request_id": "buystock_300"
+    }
   },
   "exchangetype4stock": {
-    "service_type": "stock",
-    "function_id": "105"
+    "params": {
+      "service_type": "stock",
+      "function_id": "105"
+    }
   },
   "account4stock": {
-    "service_type": "stock",
-    "function_id": "407",
-    "window_id": "StockMarketTrade"
+    "params": {
+      "service_type": "stock",
+      "function_id": "407",
+      "window_id": "StockMarketTrade"
+    }
   }
 }
