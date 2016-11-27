@@ -1,27 +1,14 @@
 {
   "basic": {
-    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/stock/exchange.action",
-    "params": {
-      "CSRF_Token": "undefined",
-      "timestamp": {
-        "eval": true,
-        "formula": "random.random()"
-      }
-    }
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/stock/exchange.action"
   },
   "home": {
-    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/",
-    "params": {
-      "randomStamp": {
-        "eval": true,
-        "formula": "random.random()"
-      }
-    }
+    "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/"
   },
   "login": {
     "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/exchange.action",
     "method": "post",
-    "params": {
+    "data": {
       "function_id": 200,
       "login_type": "stock",
       "version": 200,
@@ -45,12 +32,6 @@
     "api": "https://jy.yongjinbao.com.cn/winner_gj/gjzq/user/extraCode.jsp",
     "headers": {
       "Accept": "image/png, image/svg+xml, image/*;q=0.8, */*;q=0.5"
-    },
-    "params": {
-      "randomStamp": {
-        "eval": true,
-        "formula": "random.random()"
-      }
     }
   },
   "buy": {
