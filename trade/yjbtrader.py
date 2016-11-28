@@ -16,6 +16,7 @@ from trade.basictrader import BasicTrader
 
 class YJBTrader(BasicTrader):
     api_file = os.path.dirname(__file__) + '/config/yjb.json'
+    market = {"sh": 1, "sz": 2}
 
     def __init__(self, account_file):
         super(YJBTrader, self).__init__(api_file=self.api_file)
@@ -83,7 +84,7 @@ class YJBTrader(BasicTrader):
 
         if error_no == '-1':
             raise LoginError('error_no:{},error_info:{}'.format(error_no, error_info))
-        elif error_no is not None:
+        elif error_no is not None and error_no != '0':
             raise TradeError('error_no:{},error_info:{}'.format(error_no, error_info))
         return True
 
@@ -110,8 +111,11 @@ class YJBTrader(BasicTrader):
         :param entrust_no: 委托单号
         :param stock_code: 股票代码"""
         data = self.do(directive='cancel_entrust',
-                       params=dict(entrust_no=entrust_no,
-                                   stock_code=stock_code))
+                       params=dict(
+                           self.get_basic_params(),
+                           entrust_no=entrust_no,
+                           stock_code=stock_code),
+                       handle=self._default_response_handle)
         return self._check_status(data)
 
     @property
@@ -135,7 +139,7 @@ class YJBTrader(BasicTrader):
         'stock_code': '证券代码',
         'stock_name': '证券名称'}]
         """
-        return self.do(self.config['current_deal'])
+        return self.do(directive='current_deal', params=self.get_basic_params(), handle=self._default_response_handle)
 
     # TODO: 实现买入卖出的各种委托类型
     def buy(self, stock_code, price, amount=0, volume=0, entrust_prop=0):
@@ -143,15 +147,15 @@ class YJBTrader(BasicTrader):
         :param stock_code: 股票代码
         :param price: 卖出价格
         :param amount: 卖出股数
-        :param volume: 卖出总金额 由 volume / price 取整， 若指定 price 则此参数无效
+        :param volume: 卖出总金额 由 volume / price 取整， 若指定 amount 则此参数无效
         :param entrust_prop: 委托类型，暂未实现，默认为限价委托
         """
-        params = dict(
-            self.config['buy'],
-            entrust_bs=1,  # 买入1 卖出2
-            entrust_amount=amount if amount else volume // price // 100 * 100
-        )
-        return self.__trade(stock_code, price, entrust_prop=entrust_prop, other=params)
+        entrust_amount = amount if amount else volume // price // 100 * 100
+        return self.__trade(directive='buy',
+                            stock_code=stock_code,
+                            price=price,
+                            entrust_amount=entrust_amount,
+                            entrust_prop=entrust_prop)
 
     def sell(self, stock_code, price, amount=0, volume=0, entrust_prop=0):
         """卖出股票
@@ -161,73 +165,55 @@ class YJBTrader(BasicTrader):
         :param volume: 卖出总金额 由 volume / price 取整， 若指定 amount 则此参数无效
         :param entrust_prop: 委托类型，暂未实现，默认为限价委托
         """
-        params = dict(
-            self.config['sell'],
-            entrust_bs=2,  # 买入1 卖出2
-            entrust_amount=amount if amount else volume // price
-        )
-        return self.__trade(stock_code, price, entrust_prop=entrust_prop, other=params)
+        entrust_amount = amount if amount else volume // price // 100 * 100
+        return self.__trade(directive='sell',
+                            stock_code=stock_code,
+                            price=price,
+                            entrust_amount=entrust_amount,
+                            entrust_prop=entrust_prop)
 
-    def get_ipo(self, stock_code):
-        """
-        查询新股申购额度申购上限
-        :param stock_code: 申购代码!!!
-        :return: high_amount(最高申购股数) enable_amount(申购额度) last_price(发行价)
-        """
-        need_info = self.__get_trade_need_info(stock_code)
+    def __trade(self, directive, stock_code, price, entrust_amount, entrust_prop):
+        account = self.__get_shareholder_account(stock_code)
+        basic_params = self.get_basic_params()
         params = dict(
-            self.config['ipo_enable_amount'],
-            CSRF_Token='undefined',
-            timestamp=random.random(),
-            stock_account=need_info['stock_account'],  # '沪深帐号'
-            exchange_type=need_info['exchange_type'],  # '沪市1 深市2'
-            entrust_prop=0,
-            stock_code=stock_code
-        )
-        data = self.do(params)
-        if 'error_no' in data.keys() and data['error_no'] != "0":
-            self.log.debug('查询错误: %s' % (data['error_info']))
-            return None
-        return dict(high_amount=float(data['high_amount']), enable_amount=data['enable_amount'],
-                    last_price=float(data['last_price']))
-
-    def __trade(self, stock_code, price, entrust_prop, other):
-        # 检查是否已经掉线
-        if not self.__heart_thread.is_alive():
-            check_data = self._balance()
-            if type(check_data) == dict:
-                return check_data
-        need_info = self.__get_trade_need_info(stock_code)
-        return self.do(dict(
-            other,
-            stock_account=need_info['stock_account'],  # '沪深帐号'
-            exchange_type=need_info['exchange_type'],  # '沪市1 深市2'
-            entrust_prop=entrust_prop,  # 委托方式
-            stock_code='{:0>6}'.format(stock_code),  # 股票代码, 右对齐宽为6左侧填充0
-            elig_riskmatch_flag=1,  # 用户风险等级
+            entrust_bs=1 if directive == 'buy' else 2,  # 买入1 卖出2,
+            entrust_prop=entrust_prop,
             entrust_price=price,
-        ))
+            entrust_amount=entrust_amount,
+            stock_code='{:0>6}'.format(stock_code),
+            elig_riskmatch_flag=1
+        )
+        params.update(account)
+        params.update(basic_params)
+        return self.do(directive=directive, params=params, handle=self._default_response_handle)
 
-    def __get_trade_need_info(self, stock_code):
+    def ipo(self):
+        """
+        新股申购
+        """
+        basic_params = self.get_basic_params()
+        ipos = sutils.get_today_ipo()
+        for ipo in ipos:
+            market = sutils.get_stock_type(ipo['code'])
+            params = dict(
+                basic_params,
+                stock_account=self.account_info[market],  # '沪深帐号'
+                exchange_type=self.market[market],  # '沪市1 深市2'
+                entrust_prop=0,
+                stock_code=ipo['applyCode']
+            )
+            data = self.do(directive='ipo', params=params, handle=self._default_response_handle)
+            if self._check_status(data):
+                self.buy(stock_code=ipo['applyCode'],
+                         price=0.00,
+                         amount=data['enable_amount'] if data['high_amount'] > data['enable_amount'] else data['high_amount'])
+
+    def __get_shareholder_account(self, stock_code):
         """获取股票对应的证券市场和帐号"""
-        # 获取股票对应的证券市场
-        sh_exchange_type = 1
-        sz_exchange_type = 2
-        exchange_type = sh_exchange_type if sutils.get_stock_type(stock_code) == 'sh' else sz_exchange_type
-        # 获取股票对应的证券帐号
-        if not hasattr(self, 'exchange_stock_account'):
-            self.exchange_stock_account = dict()
-        if exchange_type not in self.exchange_stock_account:
-            stock_account_index = 0
-            response_data = self.do(dict(
-                self.config['account4stock'],
-                exchange_type=exchange_type,
-                stock_code=stock_code
-            ))[stock_account_index]
-            self.exchange_stock_account[exchange_type] = response_data['stock_account']
+        market = sutils.get_stock_type(stock_code)
         return dict(
-            exchange_type=exchange_type,
-            stock_account=self.exchange_stock_account[exchange_type]
+            exchange_type=self.market[market],
+            stock_account=self.account_info[market]
         )
 
     @staticmethod

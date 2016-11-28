@@ -76,7 +76,7 @@
       "service_type": "stock"
     }
   },
-  "ipo_enable_amount": {
+  "ipo": {
     "params": {
       "request_id": "buystock_300"
     }

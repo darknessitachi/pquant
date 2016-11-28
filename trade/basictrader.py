@@ -52,7 +52,8 @@ class BasicTrader(object):
     DEFAULT_METHOD = 'get'
 
     def __init__(self, api_file):
-        logging.basicConfig(level='DEBUG',
+        # TODO 增加全局日志系统
+        logging.basicConfig(level='INFO',
                             format='%(asctime)s [%(levelname)s] %(name)s: %(message)s ',
                             datefmt='%Y-%m-%d %H:%M:%S')
         self.log = logging.getLogger('交易')
@@ -239,17 +240,13 @@ class BasicTrader(object):
         while True:
             if self.__heart_active:
                 try:
-                    log_level = self.log.level
-                    self.log.setLevel(logging.ERROR)
-                    self.log.info("心跳线程......")
                     self._check_status(self._heartbeat())
-                    self.log.setLevel(log_level)
                 except LoginError as e:
-                    self.log.info(e)
+                    self.log.error(e)
                     self.login_status = False
                     self.__heart_active = False
-                except ConnectionResetError as e:
-                    self.log.info(e)
+                except requests.ConnectionError as e:
+                    self.log.error(e)
                     continue
                 finally:
                     time.sleep(30)
