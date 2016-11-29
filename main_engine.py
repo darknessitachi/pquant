@@ -5,19 +5,15 @@ import threading
 import time
 from threading import Thread, Lock
 
-import easytrader
-from logbook import Logger, StreamHandler
-from .log_handler.default_handler import DefaultLogHandler
-from .push_engine.clock_engine import ClockEngine
-from .push_engine.quotation_engine import DefaultQuotationEngine
+import trade
+from engine.clock_engine import ClockEngine
+from engine.default_quotation_engine import DefaultQuotationEngine
 
 import importlib
 import os
 from collections import OrderedDict
 from engine.event_engine import EventEngine
-
-log = Logger(os.path.basename(__file__))
-StreamHandler(sys.stdout).push_application()
+import logging
 
 PY_MAJOR_VERSION, PY_MINOR_VERSION = sys.version_info[:2]
 if (PY_MAJOR_VERSION, PY_MINOR_VERSION) < (3, 5):
@@ -29,21 +25,20 @@ ACCOUNT_OBJECT_FILE = 'account.session'
 class MainEngine:
     """主引擎，负责行情 / 事件驱动引擎 / 交易"""
 
-    def __init__(self, broker=None, need_data=None, quotation_engines=None,
-                 log_handler=DefaultLogHandler(), tzinfo=None):
+    def __init__(self, broker=None, account_file=None, quotation_engines=None, tzinfo=None):
         """初始化事件 / 行情 引擎并启动事件引擎
         """
-        self.log = log_handler
+        self.log = logging.getLogger("MainEngine")
         self.broker = broker
 
         # 登录账户
-        if (broker is not None) and (need_data is not None):
-            self.user = easytrader.use(broker)
-            need_data_file = pathlib.Path(need_data)
+        if (broker is not None) and (account_file is not None):
+            self.user = trade.use(broker,account_file)
+            need_data_file = pathlib.Path(account_file)
             if need_data_file.exists():
-                self.user.prepare(need_data)
+                self.user.login()
             else:
-                log_handler.warn("券商账号信息文件 %s 不存在, easytrader 将不可用" % need_data)
+                self.log.warn("券商账号信息文件 %s 不存在, trader 将不可用" % account_file)
         else:
             self.user = None
             self.log.info('选择了无交易模式')
@@ -104,10 +99,6 @@ class MainEngine:
         """启动主引擎"""
         self.event_engine.start()
         self._add_main_shutdown(self.event_engine.stop)
-
-        if self.broker == 'gf':
-            self.log.warn("sleep 10s 等待 gf 账户加载")
-            time.sleep(10)
         for quotation_engine in self.quotation_engines:
             quotation_engine.start()
             self._add_main_shutdown(quotation_engine.stop)

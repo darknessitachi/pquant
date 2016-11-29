@@ -1,11 +1,11 @@
 # coding: utf-8
 import time
 from threading import Thread
+from abc import abstractclassmethod
+from engine.event_engine import Event
 
-from easyquant.event_engine import Event
 
-
-class BaseEngine:
+class BasicQuotationEngine:
     """行情推送引擎基类"""
     EventType = 'base'
     PushInterval = 1
@@ -35,10 +35,13 @@ class BaseEngine:
             self.event_engine.put(event)
             self.wait()
 
+
+    @abstractclassmethod
     def fetch_quotation(self):
         # return your quotation
         return None
 
+    @abstractclassmethod
     def init(self):
         # do something init
         pass
