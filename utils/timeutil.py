@@ -1,15 +1,15 @@
 import datetime
-from datetime import timedelta,tzinfo
+from datetime import timedelta, tzinfo
 from functools import lru_cache
 import requests
 import time
 
+
 @lru_cache()
-def is_holiday(day):
+def is_holiday(day: str):
     api = 'http://www.easybots.cn/api/holiday.php'
     params = {'d': day}
     rep = requests.get(api, params)
-    print(rep)
     res = rep.json()[day if isinstance(day, str) else day[0]]
     return True if res == "1" else False
 
@@ -19,7 +19,7 @@ def is_holiday_today():
     return is_holiday(today)
 
 
-def is_trade_time_now(time = time.localtime()):
+def is_trade_time_now(time=time.localtime()):
     now_time = time.localtime()
     now = (now_time.tm_hour, now_time.tm_min, now_time.tm_sec)
     if (9, 15, 0) <= now <= (11, 30, 0) or (13, 0, 0) <= now <= (15, 0, 0):
@@ -51,11 +51,14 @@ def next_trade_time():
     time_delta = next_trade_start - now_time
     return time_delta.total_seconds()
 
+
 def is_weekend(now_time):
     return now_time.weekday() >= 5
 
+
 def is_trade_date(now_time):
-    return not (is_holiday(now_time) or is_weekend(now_time))
+    return not (is_holiday(now_time.strftime('%Y%m%d')) or is_weekend(now_time))
+
 
 def get_next_trade_date(now_time):
     """
@@ -78,6 +81,7 @@ def get_next_trade_date(now_time):
                 return now.date()
         if days > max_days:
             raise ValueError('无法确定 %s 下一个交易日' % now_time)
+
 
 OPEN_TIME = (
     (datetime.time(9, 15, 0), datetime.time(11, 30, 0)),

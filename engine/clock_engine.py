@@ -68,8 +68,8 @@ class ClockMomentHandler:
         self.makeup = makeup
         self.call = call or (lambda: None)
         self.next_time = datetime.datetime.combine(
-                self.clock_engine.now_dt.date(),
-                self.moment,
+            self.clock_engine.now_dt.date(),
+            self.moment,
         )
 
         if not self.makeup and self.is_active():
@@ -87,8 +87,8 @@ class ClockMomentHandler:
                 next_date = self.next_time.date() + datetime.timedelta(days=1)
 
             self.next_time = datetime.datetime.combine(
-                    next_date,
-                    self.moment
+                next_date,
+                self.moment
             )
 
     def is_active(self):
@@ -116,12 +116,11 @@ class ClockEngine:
 
         self.event_engine = event_engine
         self.is_active = True
-        self.clock_engine_thread = Thread(target=self.clocktick, name="ClockEngine.clocktick")
+        self.clock_engine_thread = Thread(target=self.clocktick, name="ClockEngine.%s" % self.EventType)
         self.sleep_time = 1
-        self.trading_state = True if (etime.is_tradetime(datetime.datetime.now()) and etime.is_trade_date(datetime.datetime.now())) else False
+        self.trading_state = True if (etime.is_tradetime(datetime.datetime.now()) and etime.is_trade_date(datetime.date.today())) else False
         self.clock_moment_handlers = deque()
         self.clock_interval_handlers = set()
-
         self._init_clock_handler()
 
     def _init_clock_handler(self):

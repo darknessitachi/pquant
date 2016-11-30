@@ -7,17 +7,13 @@ from threading import Thread, Lock
 
 import trade
 from engine.clock_engine import ClockEngine
-from engine.default_quotation_engine import DefaultQuotationEngine
+from engine.quotation_engine import QuotationEngine
 
 import importlib
 import os
 from collections import OrderedDict
 from engine.event_engine import EventEngine
 import logging
-
-PY_MAJOR_VERSION, PY_MINOR_VERSION = sys.version_info[:2]
-if (PY_MAJOR_VERSION, PY_MINOR_VERSION) < (3, 5):
-    raise Exception('Python 版本需要 3.5 或以上, 当前版本为 %s.%s 请升级 Python' % (PY_MAJOR_VERSION, PY_MINOR_VERSION))
 
 ACCOUNT_OBJECT_FILE = 'account.session'
 
@@ -46,7 +42,7 @@ class MainEngine:
         self.event_engine = EventEngine()
         self.clock_engine = ClockEngine(self.event_engine, tzinfo)
 
-        quotation_engines = quotation_engines or [DefaultQuotationEngine]
+        quotation_engines = quotation_engines or [QuotationEngine]
 
         if type(quotation_engines) != list:
             quotation_engines = [quotation_engines]
@@ -58,7 +54,7 @@ class MainEngine:
                 raise ValueError("行情引擎 EventType 重复:" + types)
         self.quotation_engines = []
         for quotation_engine in quotation_engines:
-            self.quotation_engines.append(quotation_engine(self.event_engine, self.clock_engine))
+            self.quotation_engines.append(quotation_engine(event_engine = self.event_engine,clock_engine = self.clock_engine))
 
         # 保存读取的策略类
         self.strategies = OrderedDict()

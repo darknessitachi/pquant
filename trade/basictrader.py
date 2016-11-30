@@ -101,7 +101,6 @@ class BasicTrader(object):
         pass
 
     @property
-    @atexit.register
     def logout(self):
         self.__heart_active = False
         self.__heart_thread.join(timeout=10)

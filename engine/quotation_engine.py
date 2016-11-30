@@ -1,22 +1,31 @@
 # coding: utf-8
 import time
+import logging
 from threading import Thread
-from abc import abstractclassmethod
 from engine.event_engine import Event
+import quotation
 
 
-class BasicQuotationEngine:
+class QuotationEngine:
     """行情推送引擎基类"""
-    EventType = 'base'
-    PushInterval = 1
+    EventType = 'quotation'
+    PushInterval = 9
 
-    def __init__(self, event_engine, clock_engine):
+    def __init__(self, event_engine, clock_engine, source=None):
+        self.log = logging.getLogger(self.EventType)
         self.event_engine = event_engine
         self.clock_engine = clock_engine
         self.is_active = True
+        self.quotation = quotation.use(source)
         self.quotation_thread = Thread(target=self.push_quotation, name="QuotationEngine.%s" % self.EventType)
         self.quotation_thread.setDaemon(False)
         self.init()
+
+    def subscribe(self, codes):
+        self.quotation.subscribe(codes)
+
+    def unsubscribe(self, codes):
+        self.quotation.unsubscribe(codes)
 
     def start(self):
         self.quotation_thread.start()
@@ -28,22 +37,19 @@ class BasicQuotationEngine:
         while self.is_active:
             try:
                 response_data = self.fetch_quotation()
-            except:
+            except Exception as e:
+                self.log.error(e)
                 self.wait()
                 continue
             event = Event(event_type=self.EventType, data=response_data)
             self.event_engine.put(event)
             self.wait()
 
-
-    @abstractclassmethod
     def fetch_quotation(self):
         # return your quotation
-        return None
+        return self.quotation.refresh()
 
-    @abstractclassmethod
     def init(self):
-        # do something init
         pass
 
     def wait(self):

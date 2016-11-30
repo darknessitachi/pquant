@@ -3,6 +3,7 @@ import aiohttp
 import logging
 import time
 import math
+from abc import abstractclassmethod
 
 
 class BasicQuotation:
@@ -13,6 +14,8 @@ class BasicQuotation:
                             datefmt='%Y-%m-%d %H:%M:%S')
         self.log = logging.getLogger('quotation')
         self.headers = headers
+        self.event_loop = asyncio.new_event_loop()
+
         if not cookies:
             self.cookies = dict()
         else:
@@ -45,14 +48,15 @@ class BasicQuotation:
         if not self.__stocks:
             self.log.info('未订阅任何股票行情.')
             return {}
-        loop = asyncio.get_event_loop()
-        future = asyncio.ensure_future(self._run(loop))
-        content = loop.run_until_complete(future)
+        asyncio.set_event_loop(self.event_loop)
+        future = asyncio.ensure_future(self._run(self.event_loop))
+        content = self.event_loop.run_until_complete(future)
         end = time.time()
         result = dict()
-        for i in content:
-            for j in i.keys():
-                result.__setitem__(j,i.get(j))
+        for future_result in content:
+            if type(future_result) is dict:
+                for j in future_result.keys():
+                    result.__setitem__(j, future_result.get(j))
         self.log.info('行情刷新完毕，耗时{}ms'.format(math.ceil((end - start) * 1000)))
         return result
 
@@ -88,13 +92,15 @@ class BasicQuotation:
     def _curl_handle(self, crawl_api, param):
         return crawl_api + param
 
+    @abstractclassmethod
     def _format_response(self, response, stock):
         """
-            解析返回结果
-        :param responses: 返回结果字符串
+            解析返回结果,需要子类实现
+        :param response: 返回结果字符串
+        :param stock: 股票代码
         :return: 规范化的 dict
         """
-        print(response)
+        pass
 
 
 if __name__ == '__main__':
@@ -102,9 +108,9 @@ if __name__ == '__main__':
     q.subscribe('601717')
     q.subscribe('600887')
     q.subscribe('600315')
-    q.subscribe(['000001', '000002', '000003'])
+    q.subscribe(['000001'])
     # print(q.subscribed)
     q.refresh()
-    q.unsubscribe(['601717', '000003', ''])
+    q.unsubscribe(['601717', '000003'])
     # print(q.subscribed)
     q.refresh()
