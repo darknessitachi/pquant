@@ -1,3 +1,12 @@
 {
-
+  "150176":{
+    "initPrice":1.358,
+    "upSize":0.05,
+    "upVal":10000,
+    "upCoefficient":1.2,
+    "downSize":0.07,
+    "downVal":10000,
+    "downCoefficient":0.8,
+    "initSize":3
+  }
 }

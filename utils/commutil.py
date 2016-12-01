@@ -13,11 +13,11 @@ def str2num(num_str, convert_type='float'):
     return num if convert_type == 'float' else int(num)
 
 
-
 def pathGet(dictionary, path):
     for item in path.split("/"):
         dictionary = dictionary[item]
     return dictionary
+
 
 def pathSet(dictionary, path, setItem):
     path = path.split("/")
@@ -38,6 +38,7 @@ def str2dict(str_):
     # str_ = re.sub(r"(\w):", r'\1":', str_)
     # str_ = str_.replace("'", "\"")
     return demjson.decode(str_)
+
 
 def show_image(image_path):
     """显示图片"""
@@ -67,4 +68,10 @@ def datetime2tick(param_time=None, format="%Y-%m-%d %H:%M:%S"):
         cur_time = param_time
     else:
         raise RuntimeError('参数错误,请输入字符串如:"2010-01-01 12:00:00" 或者 输入datetime类型日期')
-    return int(time.mktime(cur_time.timetuple()))
+    return int(time.mktime(cur_time.timetuple()) * 1000)
+
+
+def tick2datetime(time_tick):
+    import time
+    tick = time.localtime(time_tick / 1000)
+    return time.strftime("%Y-%m-%d %H:%M:%S", tick)

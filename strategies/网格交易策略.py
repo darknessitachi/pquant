@@ -1,19 +1,18 @@
 import datetime as dt
-import time
-
 from dateutil import tz
 from utils.strategyTemplate import StrategyTemplate
-
+import os
+import utils.commutil as cutils
 
 class Strategy(StrategyTemplate):
     name = '网格交易策略'
 
     def init(self):
+        self.strategy_config_path = os.path.dirname(__file__) + '/{}.json'.format(self.name)
+        self.strategy_config = cutils.file2dict(self.strategy_config_path)
         # 通过下面的方式来获取时间戳
         now_dt = self.clock_engine.now_dt
         now = self.clock_engine.now
-        now = time.time()
-
         # 注册时钟事件
         clock_type = "盘尾"
         moment = dt.time(14, 56, 30, tzinfo=tz.tzlocal())
@@ -24,50 +23,16 @@ class Strategy(StrategyTemplate):
         self.subscribe()
 
     def subscribe(self):
-        for quotation in self.quotation_engines:
-            quotation.subscribe(['601717', '600887', '600315'])
+        # for quotation in self.quotation_engines:
+        #     quotation.subscribe(['150176', '600887', '600315'])
+        pass
 
     def strategy(self, event):
-        """:param event event.data 为所有股票的信息，结构如下
-        {'162411':
-        {'ask1': '0.493',
-         'ask1_volume': '75500',
-         'ask2': '0.494',
-         'ask2_volume': '7699281',
-         'ask3': '0.495',
-         'ask3_volume': '2262666',
-         'ask4': '0.496',
-         'ask4_volume': '1579300',
-         'ask5': '0.497',
-         'ask5_volume': '901600',
-         'bid1': '0.492',
-         'bid1_volume': '10765200',
-         'bid2': '0.491',
-         'bid2_volume': '9031600',
-         'bid3': '0.490',
-         'bid3_volume': '16784100',
-         'bid4': '0.489',
-         'bid4_volume': '10049000',
-         'bid5': '0.488',
-         'bid5_volume': '3572800',
-         'buy': '0.492',
-         'close': '0.499',
-         'high': '0.494',
-         'low': '0.489',
-         'name': '华宝油气',
-         'now': '0.493',
-         'open': '0.490',
-         'sell': '0.493',
-         'turnover': '420004912',
-         'volume': '206390073.351'}}
-        """
-        # 使用 self.user 来操作账户，用法同 easytrader 用法
-        # 使用 self.log.info('message') 来打印你所需要的 log
-        # print('demo1 的 log 使用自定义 log 的方式记录在 demo1.log')
+
         self.log.info('{}'.format(self.name))
-        self.log.info('行情数据: 万科价格: %s' % event.data)
+        # self.log.info('行情数据: H股B: %s' % event.data['150176'])
         self.log.info('检查持仓')
-        self.log.info(self.user.balance)
+        # self.log.info(self.user.balance)
         self.log.info('\n')
 
     def clock(self, event):

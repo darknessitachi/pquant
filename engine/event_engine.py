@@ -33,7 +33,6 @@ class EventEngine:
         while self.__active:
             try:
                 event = self.__queue.get(block=True, timeout=1)
-                print(event.data)
                 handle_thread = Thread(target=self.__process, name="EventEngine.__process", args=(event,))
                 handle_thread.start()
             except Empty:
