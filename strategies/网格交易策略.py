@@ -23,8 +23,8 @@ class Strategy(StrategyTemplate):
         self.subscribe()
 
     def subscribe(self):
-        # for quotation in self.quotation_engines:
-        #     quotation.subscribe(['150176', '600887', '600315'])
+        for quotation in self.quotation_engines:
+            quotation.subscribe(['150176', '600887', '600315'])
         pass
 
     def strategy(self, event):
