@@ -5,7 +5,81 @@ import utils.commutil as cutils
 import logging
 
 
-class StrategyTemplate:
+class Object(object):
+    def copy(self, **kwargs):
+        import copy
+        o = copy.copy(self)
+        o.__dict__.update(kwargs)
+        return o
+
+    @classmethod
+    def from_dict(cls, dict):
+        o = cls()
+        o.__dict__.update(dict)
+        return o
+
+
+class StrategyObject(Object):
+    # copy object from us to user space
+    def copy(self, o):
+        if o is None:
+            return self
+        for k in self.__dict__:
+            setattr(self, k, getattr(o, k, None))
+        return self
+
+    @classmethod
+    def copy_of(cls, o):
+        if o is None:
+            return None
+        self = cls()
+        return self.copy(o) or self
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, str(self.__dict__))
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+
+StrategyState_instance_count = 0
+
+class StrategyState(StrategyObject):
+    def __init__(self):
+        StrategyObject.__init__(self)
+        StrategyObject.__setattr__(self, 'fields', set())
+        pass
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        global StrategyState_instance_count
+        StrategyState_instance_count += 1
+
+    # 不管有多少个 PersistentState, 反序列话之后都只有一个 g, __dict__ 合并在一起
+    def __reduce__(self):
+        return get_g, (), self.__dict__
+
+    def __setattr__(self, name, value):
+        if value is not None and name not in self.fields:
+            import pickle as pickle
+            try:
+                pickle.dumps(name)
+                pickle.dumps(value)
+            except Exception as  e:
+                pass
+                # log.error("g.%s 不能通过pickle序列化, 在模拟交易时进程重启后会丢失状态, 请不要把此对象放在 g 中. 序列化时的错误: %s" \
+                #           % (name, e))
+            self.fields.add(name)
+        StrategyObject.__setattr__(self, name, value)
+
+    pass
+
+g = StrategyState()
+
+def get_g():
+    return g
+
+class StrategyTemplate(StrategyObject):
     name = 'DefaultStrategyTemplate'
 
     def __init__(self, user, log_handler, main_engine):
@@ -17,9 +91,9 @@ class StrategyTemplate:
         logging.basicConfig(level=logging.DEBUG)
         self.log = logging.getLogger("strategy")
 
-        self.init()
+        self.initialize()
 
-    def init(self):
+    def initialize(self):
         # 进行相关的初始化操作
         pass
 
