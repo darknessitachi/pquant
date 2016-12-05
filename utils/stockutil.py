@@ -1,6 +1,7 @@
 import re
 import requests
 
+
 def get_stock_type(stock_code):
     """判断股票ID对应的证券市场
     匹配规则
@@ -10,7 +11,7 @@ def get_stock_type(stock_code):
     :param stock_code:股票ID, 若以 'sz', 'sh' 开头直接返回对应类型，否则使用内置规则判断
     :return 'sh' or 'sz'"""
     assert type(stock_code) is str, 'stock code need str type'
-    if stock_code.startswith(('sh', 'sz','SH','SZ')):
+    if stock_code.startswith(('sh', 'sz', 'SH', 'SZ')):
         return stock_code[:2].lower()
     if stock_code.startswith(('50', '51', '60', '90', '110', '113', '132', '204')):
         return 'sh'
@@ -20,6 +21,7 @@ def get_stock_type(stock_code):
         return 'sh'
     return 'sz'
 
+
 def get_all_stock_codes():
     """获取所有股票 ID 到 all_stock_code 目录下"""
     all_stock_codes_url = 'http://www.shdjt.com/js/lib/astock.js'
@@ -27,6 +29,7 @@ def get_all_stock_codes():
     response = requests.get(all_stock_codes_url)
     stock_codes = grep_stock_codes.findall(response.text)
     return stock_codes
+
 
 def get_today_ipo():
     """
@@ -51,11 +54,10 @@ def get_today_ipo():
         'Connection': 'keep-alive'
     }
 
-
     base_url = 'https://xueqiu.com'
     ipo_url = "https://xueqiu.com/proipo/query.json?column=symbol,name,onl_subcode,onl_subbegdate,actissqty,onl" \
-                   "_actissqty,onl_submaxqty,iss_price,onl_lotwiner_stpub_date,onl_lotwinrt,onl_lotwin_amount,stock_" \
-                   "income&orderBy=onl_subbegdate&order=desc&stockType=&page=1&size=30&_=%s" % (str(datetime2tick()))
+              "_actissqty,onl_submaxqty,iss_price,onl_lotwiner_stpub_date,onl_lotwinrt,onl_lotwin_amount,stock_" \
+              "income&orderBy=onl_subbegdate&order=desc&stockType=&page=1&size=30&_=%s" % (str(datetime2tick()))
 
     session = requests.session()
     session.get(base_url, headers=headers)  # 产生cookies
@@ -71,11 +73,12 @@ def get_today_ipo():
                 'code': line[0],
                 'name': line[1],
                 'applyCode': line[2],
-                'ceiling':line[6],
+                'ceiling': line[6],
                 'price': line[7]
             })
 
     return ipo
+
 
 def verify_code(image_path, broker='yjb'):
     """识别验证码，返回识别后的字符串，使用 tesseract 实现
@@ -87,7 +90,22 @@ def verify_code(image_path, broker='yjb'):
     else:
         raise RuntimeError('暂不支持!')
 
+
 def yjb_verify_code(image_path):
     from .captcha import YJBCaptcha
     captcha = YJBCaptcha(imagePath=image_path)
     return captcha.string()
+
+
+def ensure_price(stock: str, price):
+    """
+        格式化价格
+    :param price: 价格
+    :param stock: 股票编码
+    :return: 格式化后的价格
+    """
+    return round(price, 3) if stock.startswith(('16', '50', '15', '51', '18', '13', '90', '204')) else round(price, 2)
+
+
+def ensure_number(stock: str, amount, price):
+    return amount // price // 100 * 100

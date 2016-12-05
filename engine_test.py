@@ -6,7 +6,7 @@ import time
 # event = EventEngine()
 # clock = ClockEngine(event)
 main = MainEngine(broker='yjb',
-                  account_file='/Users/irock/Documents/Working/PythonProject/quant/trade/yjb.json',
+                  account_file='/Users/irock/Working/PythonProject/pquant/trade/yjb.json',
                   quotation_engines=QuotationEngine)
 main.load_strategy()
 main.start()

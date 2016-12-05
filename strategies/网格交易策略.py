@@ -4,6 +4,7 @@ from utils.strategyTemplate import StrategyTemplate
 import os
 import utils.commutil as cutils
 
+
 class Strategy(StrategyTemplate):
     name = '网格交易策略'
 
