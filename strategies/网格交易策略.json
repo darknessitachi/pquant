@@ -1,11 +1,12 @@
 {
   "150176": {
     "initHoldPosition": 30,
-    "initPrice": 1.358,
+    "initPrice": 0.687,
     "upSize": 7,
     "upVal": 10000,
     "downSize": 5,
     "downVal": 10000,
-    "downCoefficient": 0.2
+    "valCoefficient": 15,
+    "totalAmount": 100000
   }
 }
