@@ -1,0 +1,34 @@
+{
+  "positions": {
+    "enable_amount": "可卖数量",
+    "current_amount": "当前数量",
+    "position_str": "定位串",
+    "keep_cost_price": "保本价",
+    "stock_code": "证券代码",
+    "cost_price": "摊薄成本价",
+    "stock_name": "证券名称",
+    "last_price": "最新价",
+    "income_balance": "摊薄浮动盈亏",
+    "market_value": "证券市值"
+  },
+  "balance": {
+    "money_type": "币种",
+    "asset_balance": "资产总值",
+    "current_balance": "可取余额",
+    "market_value": "证券市值",
+    "enable_balance": "可用金额",
+    "pre_interest": "预计利息"
+  },
+  "entrust": {
+    "entrust_price": "委托价格",
+    "report_time": "申报时间",
+    "entrust_status": "委托状态",
+    "stock_name": "证券名称",
+    "business_amount": "成交数量",
+    "entrust_amount": "委托数量",
+    "entrust_no": "委托编号",
+    "entrust_bs": "买卖方向",
+    "stock_code": "证券代码",
+    "business_price": "成交价格"
+  }
+}

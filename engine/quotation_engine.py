@@ -9,14 +9,14 @@ import quotation
 class QuotationEngine:
     """行情推送引擎基类"""
     EventType = 'quotation'
-    PushInterval = 9
+    PushInterval = 60
 
     def __init__(self, event_engine, clock_engine, source=None):
         self.log = logging.getLogger(self.EventType)
         self.event_engine = event_engine
         self.clock_engine = clock_engine
         self.is_active = True
-        self.quotation = quotation.use(source)
+        self.quotation = quotation.use('lf')
         self.quotation_thread = Thread(target=self.push_quotation, name="QuotationEngine.%s" % self.EventType)
         self.quotation_thread.setDaemon(False)
         self.init()

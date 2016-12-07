@@ -2,4 +2,4 @@ from trade.yjbtrader import YJBTrader
 if __name__ == '__main__':
     user = YJBTrader()
     user.prepare('yjb.json')
-    print(user._balance())
+    print(user.get_balance())

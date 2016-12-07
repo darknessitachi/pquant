@@ -2,13 +2,14 @@
 from __future__ import division
 import json
 import os
-import random
 import re
+import random
+from collections import namedtuple
 import tempfile
 import urllib.parse
 import demjson
-import utils.commutil as cutils
-import utils.stockutil as sutils
+import utils.commutil as cu
+import utils.stockutil as su
 from trade.basictrader import LoginError
 from trade.basictrader import TradeError
 from trade.basictrader import BasicTrader
@@ -20,10 +21,10 @@ class YJBTrader(BasicTrader):
 
     def __init__(self, account_file):
         super(YJBTrader, self).__init__(api_file=self.api_file)
-        self.account_info = cutils.file2dict(path=account_file)
+        self.account_info = cu.file2dict(path=account_file)
 
     def _login(self, throw=False):
-        self.do(directive="home")
+        self.do(directive="home")  # 生成cookies
         verify_code = self.do(directive='verifyCode',
                               handle=self.recognize_code,
                               params=dict(
@@ -34,7 +35,7 @@ class YJBTrader(BasicTrader):
 
         login_status, result = self.do(directive='login',
                                        data=dict(
-                                           mac_addr=cutils.get_mac_address(),
+                                           mac_addr=cu.get_mac_address(),
                                            account_content=self.account_info['account'],
                                            password=urllib.parse.unquote(self.account_info['password']),
                                            validateCode=verify_code
@@ -42,6 +43,8 @@ class YJBTrader(BasicTrader):
                                        handle=self._login_handle)
         if login_status is False and throw:
             raise LoginError(result)
+        else:
+            self.log.error(result)
         return login_status
 
     def _logout(self):
@@ -55,10 +58,10 @@ class YJBTrader(BasicTrader):
         with open(image_path, 'wb') as f:
             f.write(resp.content)
 
-        verify_code = sutils.verify_code(image_path, 'yjb')
-        self.log.debug('verify code detect result: %s' % verify_code)
+        verify_code_ = su.verify_code(image_path, 'yjb')
+        self.log.debug('verify code detect result: %s' % verify_code_)
         os.remove(image_path)
-        return verify_code
+        return verify_code_
 
     def _login_handle(self, resp):
         self.log.debug('login response: %s' % resp.text)
@@ -68,7 +71,7 @@ class YJBTrader(BasicTrader):
             return False, resp.text
 
     def _heartbeat(self):
-        return self._balance()
+        return self.get_balance()
 
     def _check_status(self, data):
         """
@@ -88,20 +91,61 @@ class YJBTrader(BasicTrader):
             raise TradeError('error_no:{},error_info:{}'.format(error_no, error_info))
         return True
 
-    def _balance(self):
-        """获取账户资金状况"""
+    def get_balance(self):
+        """
+            获取账户资金状况
+            "money_type": "币种",
+            "asset_balance": "资产总值",
+            "current_balance": "可取余额",
+            "market_value": "证券市值",
+            "enable_balance": "可用金额",
+            "pre_interest": "预计利息"
+        """
         return self.do(directive='balance',
                        params=self.get_basic_params(),
-                       handle=self._default_response_handle)
+                       handle=self._default_response_handle,
+                       meta_data=('Balance', ['asset_balance', 'current_balance', 'market_value', 'enable_balance']))
 
-    def _position(self):
-        """获取持仓"""
-        return self.do(directive='position',
-                       params=self.get_basic_params(),
-                       handle=self._default_response_handle)
+    def get_position(self, stock_code):
+        """
+            获取持仓,数据结构如下
+            "enable_amount": "可卖数量",
+            "current_amount": "当前数量",
+            "position_str": "定位串",
+            "keep_cost_price": "保本价",
+            "stock_code": "证券代码",
+            "cost_price": "摊薄成本价",
+            "stock_name": "证券名称",
+            "last_price": "最新价",
+            "income_balance": "摊薄浮动盈亏",
+            "market_value": "证券市值"
+        """
+        Position = namedtuple('Position', ['stock_code', 'stock_name', 'current_amount', 'enable_amount', 'cost_price',
+                                           'last_price', 'market_value', 'income_balance'])
 
-    def _entrust(self):
+        positions = self.do(directive='position',
+                            params=self.get_basic_params(),
+                            handle=self._default_response_handle)
+
+        for i in range(len(positions)):
+            if i == 0:
+                continue
+            code = positions[i]['stock_code']
+            if stock_code and stock_code == code:
+                return Position(stock_code=positions[i]['stock_code'],
+                                stock_name=positions[i]['stock_name'],
+                                current_amount=positions[i]['current_amount'],
+                                enable_amount=positions[i]['enable_amount'],
+                                cost_price=positions[i]['cost_price'],
+                                last_price=positions[i]['last_price'],
+                                market_value=positions[i]['market_value'],
+                                income_balance=positions[i]['income_balance'])
+
+        return None
+
+    def get_entrust(self):
         """获取当日委托列表"""
+        Entrusts = namedtuple('Entrusts', )
         return self.do(directive='entrust',
                        params=self.get_basic_params(),
                        handle=self._default_response_handle)
@@ -192,9 +236,9 @@ class YJBTrader(BasicTrader):
         新股申购
         """
         basic_params = self.get_basic_params()
-        ipos = sutils.get_today_ipo()
+        ipos = su.get_today_ipo()
         for ipo in ipos:
-            market = sutils.get_stock_type(ipo['code'])
+            market = su.get_stock_type(ipo['code'])
             params = dict(
                 basic_params,
                 stock_account=self.account_info[market],  # '沪深帐号'
@@ -206,11 +250,12 @@ class YJBTrader(BasicTrader):
             if self._check_status(data):
                 self.buy(stock_code=ipo['applyCode'],
                          price=0.00,
-                         amount=data['enable_amount'] if data['high_amount'] > data['enable_amount'] else data['high_amount'])
+                         amount=data['enable_amount'] if data['high_amount'] > data['enable_amount'] else data[
+                             'high_amount'])
 
     def __get_shareholder_account(self, stock_code):
         """获取股票对应的证券市场和帐号"""
-        market = sutils.get_stock_type(stock_code)
+        market = su.get_stock_type(stock_code)
         return dict(
             exchange_type=self.market[market],
             stock_account=self.account_info[market]
@@ -225,18 +270,29 @@ class YJBTrader(BasicTrader):
         return basic_params
 
     @staticmethod
-    def __format_response_data(resp):
+    def _get_return_json(resp):
         # 获取 returnJSON
         return_json = json.loads(resp.text)['returnJson']
         raw_json_data = demjson.decode(return_json)
         fun_data = raw_json_data['Func%s' % raw_json_data['function_id']]
         return fun_data
 
-    def _default_response_handle(self, resp):
+    def _default_response_handle(self, resp, meta_data=None):
         """格式化response
         :param resp: response
         """
-        data = self.__format_response_data(resp)
+        json_data = self._get_return_json(resp)
+        converted_data = self.__convert_data_type(json_data)
+        if meta_data:
+            typename, fields = meta_data
+            _class_ = namedtuple(typename, fields)
+            for line in range(len(converted_data)):
+                if line == 0: continue
+
+
+        return json_data
+
+    def __convert_data_type(self, data):
         if type(data) is not list:
             return data
         int_match_str = '|'.join(self.config['response_format']['int'])
@@ -245,9 +301,9 @@ class YJBTrader(BasicTrader):
             for key in item:
                 try:
                     if re.search(int_match_str, key) is not None:
-                        item[key] = cutils.str2num(item[key], 'int')
+                        item[key] = cu.str2num(item[key], 'int')
                     elif re.search(float_match_str, key) is not None:
-                        item[key] = cutils.str2num(item[key], 'float')
+                        item[key] = cu.str2num(item[key], 'float')
                 except ValueError:
                     continue
         return data
@@ -258,5 +314,4 @@ if __name__ == '__main__':
 
     user = YJBTrader('yjb.json')
     user.login(10)
-    print(user.balance)
     time.sleep(10000)

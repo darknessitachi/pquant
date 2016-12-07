@@ -1,3 +1,13 @@
+def my_assert(condition, e=None):
+    if not condition:
+        if not e:
+            e = AssertionError()
+        elif isinstance(e, str):
+            e = AssertionError(e)
+        elif not isinstance(e, Exception):
+            e = AssertionError(str(e))
+        raise e
+
 def file2dict(path):
     import json
     with open(path, encoding='utf-8') as f:

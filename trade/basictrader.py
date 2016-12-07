@@ -1,14 +1,11 @@
 # coding: utf-8
 import logging
-
-import atexit
-
 import os
 import time
 import ssl
 from abc import abstractmethod
 from threading import Thread
-import utils.commutil as cutils
+from utils.commutil import my_assert,pathGet,file2dict
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.poolmanager import PoolManager
@@ -39,21 +36,19 @@ class Ssl3HttpAdapter(HTTPAdapter):
 
 class BasicTrader(object):
     __global_config_path = os.path.dirname(__file__) + '/config/global.json'
-
     HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko',
         'Accept': 'text/html, application/xhtml+xml, */*',
         'Accept-Language': 'zh-CN',
         'Accept-Encoding': 'gzip, deflate'
     }
-
     TRADE_DIRECTIVE = ['home', 'verifyCode', 'login', 'logout', 'buy', 'sell', 'balance', 'position',
                        'entrust', 'ipo', "current_deal", "cancel_entrust"]
     DEFAULT_METHOD = 'get'
 
     def __init__(self, api_file):
         # TODO 增加全局日志系统
-        logging.basicConfig(level='INFO',
+        logging.basicConfig(level='DEBUG',
                             format='%(asctime)s [%(levelname)s] %(name)s: %(message)s ',
                             datefmt='%Y-%m-%d %H:%M:%S')
         self.log = logging.getLogger('交易')
@@ -62,8 +57,8 @@ class BasicTrader(object):
         self.httpClient.mount('https://', Ssl3HttpAdapter())
         self.httpClient.headers = self.HEADERS
 
-        self.config = cutils.file2dict(path=api_file)
-        self.global_config = cutils.file2dict(self.__global_config_path)
+        self.config = file2dict(path=api_file)
+        self.global_config = file2dict(self.__global_config_path)
         self.config.update(self.global_config)
 
         self.login_status = False  # 登录状态
@@ -100,7 +95,6 @@ class BasicTrader(object):
         """
         pass
 
-    @property
     def logout(self):
         self.__heart_active = False
         self.__heart_thread.join(timeout=10)
@@ -112,51 +106,32 @@ class BasicTrader(object):
         """结束保持 token 在线的进程"""
         pass
 
-    @property
-    def balance(self):
-        return self._balance()
-
     @abstractmethod
-    def _balance(self):
+    def get_balance(self):
         """获取账户资金状况"""
         pass
 
-    @property
-    def position(self):
-        return self._position()
-
     @abstractmethod
-    def _position(self):
+    def get_position(self, stock_code):
         """获取持仓"""
         pass
 
-    @property
-    def entrust(self):
-        return self._entrust()
-
     @abstractmethod
-    def _entrust(self):
+    def get_entrust(self):
         """获取当日委托列表"""
         pass
 
     def get_config(self, config_key):
         result = {}
         try:
-            return cutils.pathGet(self.config, config_key)
+            return pathGet(self.config, config_key)
         except KeyError:
             return result
 
     # TODO 增加注解
     def _request(self, request_api):
-        self.log.debug(
-            'url:{},params:{},data:{}'.format(request_api['url'], request_api['params'], request_api['data']))
-        self.log.debug('headers:{}'.format(request_api['headers']))
-        resp = self.httpClient.request(method=request_api['method'],
-                                       url=request_api['url'],
-                                       params=request_api['params'],
-                                       data=request_api['data'],
-                                       headers=request_api['headers'],
-                                       timeout=(5, 7))
+        self.log.debug(request_api)
+        resp = self.httpClient.request(**request_api)
         if resp.status_code == 200:
             self.log.debug('status:{},url:{}'.format(resp.status_code, request_api['url']))
         else:
@@ -167,20 +142,24 @@ class BasicTrader(object):
                                                                                         resp.text))
         return resp
 
-    def do(self, directive, params=None, data=None, callback=None, handle=None):
-        """发起对 api 的请求并过滤返回结果
-        :param data:
-        :param directive:
-        :param callback:
-        :param handle:
-        :param params: 交易所需的动态参数"""
-        if not directive or type(directive) is not str or directive not in self.TRADE_DIRECTIVE:
-            raise TradeError("无效的交易指令")
+    def do(self, directive, params=None, data=None, callback=None, handle=None, meta_data=None):
+        """
+            发起对 api 的请求并过滤返回结果
+            :param meta_data: 格式化元数据信息
+            :param data:
+            :param directive:
+            :param callback:
+            :param handle:
+            :param params: 交易所需的动态参数
+        """
+        my_assert(directive in self.TRADE_DIRECTIVE, "无效的交易指令{}".format(directive))
         request_api = self.__get_request_api(directive, params, data)
         resp = self._request(request_api)
         if callback:
             callback(resp)
-        if handle:
+        if handle and meta_data:
+            return handle(resp, meta_data)
+        elif handle:
             return handle(resp)
         return resp.text
 

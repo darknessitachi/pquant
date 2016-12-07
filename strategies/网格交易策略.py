@@ -9,13 +9,17 @@ import utils.stockutil as sutils
 
 class Strategy(StrategyTemplate):
     name = '网格交易策略'
-    current_path = os.path.dirname(__file__)
-    tmp_file_path = current_path + '/' + name + '.tmp'
-    config_file_path = current_path + '/' + name + '.json'
+    strategy_dir = os.path.dirname(__file__)
+    tmp_file_path = strategy_dir + '/' + name + '.tmp'
+    config_file_path = strategy_dir + '/' + name + '.json'
     config = cutils.file2dict(config_file_path)
     g = StrategyState()
 
     def initialize(self):
+        """
+            策略初始化函数
+        :return:
+        """
         self.log = logging.getLogger(self.name)
         self.subscribe()
         if os.path.exists(self.tmp_file_path):
@@ -23,7 +27,8 @@ class Strategy(StrategyTemplate):
         else:
             self.g.stocks = defaultdict(dict)
             for key in self.config.keys():
-                self.g.stocks.setdefault(key, {'lastNet': 0, 'upPrice': self._calcPrice(key, 1),
+                self.g.stocks.setdefault(key, {'lastNet': 0,
+                                               'upPrice': self._calcPrice(key, 1),
                                                'downPrice': self._calcPrice(key, -1)})
 
     def subscribe(self):
