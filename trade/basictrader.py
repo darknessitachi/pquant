@@ -2,13 +2,10 @@
 import logging
 import os
 import time
-import ssl
 from abc import abstractmethod
 from threading import Thread
-from utils.commutil import my_assert,pathGet,file2dict
+from utils.commutil import my_assert, pathGet, file2dict
 import requests
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.poolmanager import PoolManager
 
 
 class LoginError(Exception):
@@ -21,17 +18,6 @@ class TradeError(Exception):
     def __init__(self, message=None):
         super(TradeError, self).__init__()
         self.message = message
-
-
-class Ssl3HttpAdapter(HTTPAdapter):
-    def __init__(self):
-        super(Ssl3HttpAdapter, self).__init__()
-
-    def init_poolmanager(self, connections, maxsize, block=False):
-        self.poolmanager = PoolManager(num_pools=connections,
-                                       maxsize=maxsize,
-                                       block=block,
-                                       ssl_version=ssl.PROTOCOL_TLSv1)
 
 
 class BasicTrader(object):
@@ -128,40 +114,32 @@ class BasicTrader(object):
         except KeyError:
             return result
 
-    # TODO 增加注解
-    def _request(self, request_api):
-        self.log.debug(request_api)
-        resp = self.httpClient.request(**request_api)
-        if resp.status_code == 200:
-            self.log.debug('status:{},url:{}'.format(resp.status_code, request_api['url']))
-        else:
-            self.log.error('status:{},url:{},params:{},data:{},response_text:{}'.format(resp.status_code,
-                                                                                        request_api['url'],
-                                                                                        request_api['params'],
-                                                                                        request_api['data'],
-                                                                                        resp.text))
-        return resp
-
     def do(self, directive, params=None, data=None, callback=None, handle=None, meta_data=None):
         """
             发起对 api 的请求并过滤返回结果
+            :param directive: 指令必需在TRADE_DIRECTIVE定义的列表中
+            :param params:  get 请求动态参数
+            :param data:    post 请求动态参数
+            :param callback:回调函数,缺省执行_default_response_callback 方法
+            :param handle: 处理器函数，缺省执行_default_response_handle 方法
             :param meta_data: 格式化元数据信息
-            :param data:
-            :param directive:
-            :param callback:
-            :param handle:
-            :param params: 交易所需的动态参数
         """
         my_assert(directive in self.TRADE_DIRECTIVE, "无效的交易指令{}".format(directive))
         request_api = self.__get_request_api(directive, params, data)
-        resp = self._request(request_api)
-        if callback:
-            callback(resp)
-        if handle and meta_data:
-            return handle(resp, meta_data)
-        elif handle:
-            return handle(resp)
-        return resp.text
+        self.log.info('{}-{}'.format(directive, request_api))
+        resp = self.httpClient.request(**request_api)
+        if resp.status_code == 200:
+            if callback:
+                callback(resp)
+            if handle and meta_data:
+                return handle(resp, meta_data)
+            elif handle:
+                return handle(resp)
+            else:
+                return self._default_response_handle(resp)
+        else:
+            self.log.error('指令[{}]失败,状态码:{},请求地址:{}'.format(directive, resp.status_code, resp.url))
+            raise TradeError('指令[{}]失败,状态码:{},请求地址:{}'.format(directive, resp.status_code, resp.url))
 
     def __get_request_api(self, directive, params, data):
         basic_api = self.get_config('basic')['api']
@@ -196,11 +174,14 @@ class BasicTrader(object):
         """
         pass
 
+    def _default_response_callback(self, resp):
+        return self._check_status(resp)
+
     @abstractmethod
     def _check_status(self, resp):
         """
            检查各种状态,抛出相应错误
-        :return:
+        :return: 没有错误时返回True
         :except LoginError,TradeError
         """
         pass

@@ -4,15 +4,44 @@ import json
 import os
 import re
 import random
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import tempfile
-import urllib.parse
+from urllib.parse import unquote
 import demjson
 import utils.commutil as cu
 import utils.stockutil as su
 from trade.basictrader import LoginError
 from trade.basictrader import TradeError
 from trade.basictrader import BasicTrader
+
+MESSAGES = {
+    '-10003': '您已登录一股票帐户，重登陆前请先注销!',
+    '-10001': '验证码错误'
+}
+
+
+def recognize_code(resp):
+    """
+        识别验证码
+        :return: 验证码
+    """
+    # 保存验证码
+    image_path = os.path.join(tempfile.gettempdir(), 'vcode_%d' % os.getpid())
+    with open(image_path, 'wb') as f:
+        f.write(resp.content)
+    verify_code_ = su.verify_code(image_path, 'yjb')
+    os.remove(image_path)
+    return verify_code_
+
+def get_func_data(resp):
+    return_json = get_return_json(resp)
+    raw_json_data = demjson.decode(return_json)
+    fun_data = raw_json_data['Func%s' % raw_json_data['function_id']]
+    return fun_data
+
+def get_return_json(resp):
+    # 获取 returnJSON
+    return json.loads(resp.text)['returnJson']
 
 
 class YJBTrader(BasicTrader):
@@ -26,7 +55,7 @@ class YJBTrader(BasicTrader):
     def _login(self, throw=False):
         self.do(directive="home")  # 生成cookies
         verify_code = self.do(directive='verifyCode',
-                              handle=self.recognize_code,
+                              handle=recognize_code,
                               params=dict(
                                   randomStamp=random.random()
                               ))
@@ -37,53 +66,42 @@ class YJBTrader(BasicTrader):
                                        data=dict(
                                            mac_addr=cu.get_mac_address(),
                                            account_content=self.account_info['account'],
-                                           password=urllib.parse.unquote(self.account_info['password']),
+                                           password=unquote(self.account_info['password']),
                                            validateCode=verify_code
                                        ),
                                        handle=self._login_handle)
         if login_status is False and throw:
             raise LoginError(result)
-        else:
+        elif login_status is False:
             self.log.error(result)
         return login_status
 
     def _logout(self):
         self.do(directive="logout")
 
-    def recognize_code(self, resp):
-        """获取并识别返回的验证码
-        :return:失败返回 False 成功返回 验证码"""
-        # 保存验证码
-        image_path = os.path.join(tempfile.gettempdir(), 'vcode_%d' % os.getpid())
-        with open(image_path, 'wb') as f:
-            f.write(resp.content)
-
-        verify_code_ = su.verify_code(image_path, 'yjb')
-        self.log.debug('verify code detect result: %s' % verify_code_)
-        os.remove(image_path)
-        return verify_code_
-
     def _login_handle(self, resp):
         self.log.debug('login response: %s' % resp.text)
-        if resp.text.find('上次登陆') != -1:
+        return_json = get_return_json(resp)
+        if return_json.find('上次登陆') != -1 or return_json.find('msg_no(.:.)\'-10003\'') != -1:
             return True, None
         else:
-            return False, resp.text
+            return False, return_json
 
     def _heartbeat(self):
         return self.get_balance()
 
-    def _check_status(self, data):
+    def _check_status(self, func_data):
         """
             检查各种状态,抛出相应错误
-        :param data:
-        :return:
+        :param func_data: response对象
+        :return: 无任何错误返回 True,检测到错误则抛出异常
         """
+        func_data = get_func_data(func_data)
         index = 0
-        error_no = data[index].get('error_no') if type(data) == list and data[index].get(
+        error_no = func_data[index].get('error_no') if type(func_data) == list and func_data[index].get(
             'error_no') is not None else None
-        error_info = data[index].get('error_info') if type(data) == list and data[index].get(
-            'error_no') is not None else None
+        error_info = func_data[index].get('error_info') if type(func_data) == list and func_data[index].get(
+            'error_info') is not None else None
 
         if error_no == '-1':
             raise LoginError('error_no:{},error_info:{}'.format(error_no, error_info))
@@ -103,7 +121,6 @@ class YJBTrader(BasicTrader):
         """
         return self.do(directive='balance',
                        params=self.get_basic_params(),
-                       handle=self._default_response_handle,
                        meta_data=('Balance', ['asset_balance', 'current_balance', 'market_value', 'enable_balance']))
 
     def get_position(self, stock_code):
@@ -120,35 +137,22 @@ class YJBTrader(BasicTrader):
             "income_balance": "摊薄浮动盈亏",
             "market_value": "证券市值"
         """
-        Position = namedtuple('Position', ['stock_code', 'stock_name', 'current_amount', 'enable_amount', 'cost_price',
-                                           'last_price', 'market_value', 'income_balance'])
-
         positions = self.do(directive='position',
                             params=self.get_basic_params(),
-                            handle=self._default_response_handle)
+                            meta_data=(
+                                'Position',
+                                ['stock_code', 'stock_name', 'current_amount', 'enable_amount', 'cost_price',
+                                 'last_price', 'market_value', 'income_balance']))
 
-        for i in range(len(positions)):
-            if i == 0:
-                continue
-            code = positions[i]['stock_code']
-            if stock_code and stock_code == code:
-                return Position(stock_code=positions[i]['stock_code'],
-                                stock_name=positions[i]['stock_name'],
-                                current_amount=positions[i]['current_amount'],
-                                enable_amount=positions[i]['enable_amount'],
-                                cost_price=positions[i]['cost_price'],
-                                last_price=positions[i]['last_price'],
-                                market_value=positions[i]['market_value'],
-                                income_balance=positions[i]['income_balance'])
-
+        for pos in positions:
+            if pos.stock_code == stock_code:
+                return pos
         return None
 
     def get_entrust(self):
         """获取当日委托列表"""
-        Entrusts = namedtuple('Entrusts', )
         return self.do(directive='entrust',
-                       params=self.get_basic_params(),
-                       handle=self._default_response_handle)
+                       params=self.get_basic_params())
 
     def cancel_entrust(self, entrust_no, stock_code):
         """撤单
@@ -158,8 +162,7 @@ class YJBTrader(BasicTrader):
                        params=dict(
                            self.get_basic_params(),
                            entrust_no=entrust_no,
-                           stock_code=stock_code),
-                       handle=self._default_response_handle)
+                           stock_code=stock_code))
         return self._check_status(data)
 
     @property
@@ -183,7 +186,7 @@ class YJBTrader(BasicTrader):
         'stock_code': '证券代码',
         'stock_name': '证券名称'}]
         """
-        return self.do(directive='current_deal', params=self.get_basic_params(), handle=self._default_response_handle)
+        return self.do(directive='current_deal', params=self.get_basic_params())
 
     # TODO: 实现买入卖出的各种委托类型
     def buy(self, stock_code, price, amount=0, volume=0, entrust_prop=0):
@@ -229,29 +232,30 @@ class YJBTrader(BasicTrader):
         )
         params.update(account)
         params.update(basic_params)
-        return self.do(directive=directive, params=params, handle=self._default_response_handle)
+        return self.do(directive=directive, params=params)
 
     def ipo(self):
         """
         新股申购
         """
-        basic_params = self.get_basic_params()
-        ipos = su.get_today_ipo()
-        for ipo in ipos:
-            market = su.get_stock_type(ipo['code'])
-            params = dict(
-                basic_params,
-                stock_account=self.account_info[market],  # '沪深帐号'
-                exchange_type=self.market[market],  # '沪市1 深市2'
-                entrust_prop=0,
-                stock_code=ipo['applyCode']
-            )
-            data = self.do(directive='ipo', params=params, handle=self._default_response_handle)
-            if self._check_status(data):
-                self.buy(stock_code=ipo['applyCode'],
-                         price=0.00,
-                         amount=data['enable_amount'] if data['high_amount'] > data['enable_amount'] else data[
-                             'high_amount'])
+        raise TradeError('暂不支持新股申购.')
+        # basic_params = self.get_basic_params()
+        # ipos = su.get_today_ipo()
+        # for ipo in ipos:
+        #     market = su.get_stock_type(ipo['code'])
+        #     params = dict(
+        #         basic_params,
+        #         stock_account=self.account_info[market],  # '沪深帐号'
+        #         exchange_type=self.market[market],  # '沪市1 深市2'
+        #         entrust_prop=0,
+        #         stock_code=ipo['applyCode']
+        #     )
+        #     data = self.do(directive='ipo', params=params, handle=self._default_response_handle)
+        #     if self._check_status(data):
+        #         self.buy(stock_code=ipo['applyCode'],
+        #                  price=0.00,
+        #                  amount=data['enable_amount'] if data['high_amount'] > data['enable_amount'] else data[
+        #                      'high_amount'])
 
     def __get_shareholder_account(self, stock_code):
         """获取股票对应的证券市场和帐号"""
@@ -269,30 +273,31 @@ class YJBTrader(BasicTrader):
         )
         return basic_params
 
-    @staticmethod
-    def _get_return_json(resp):
-        # 获取 returnJSON
-        return_json = json.loads(resp.text)['returnJson']
-        raw_json_data = demjson.decode(return_json)
-        fun_data = raw_json_data['Func%s' % raw_json_data['function_id']]
-        return fun_data
 
     def _default_response_handle(self, resp, meta_data=None):
         """格式化response
         :param resp: response
         """
-        json_data = self._get_return_json(resp)
-        converted_data = self.__convert_data_type(json_data)
+        # TODO 这里需要处理resp返回错误的问题
+        func_data = get_func_data(resp)
+        converted_data = self.__convert_data_type(func_data)
+        result = []
         if meta_data:
             typename, fields = meta_data
             _class_ = namedtuple(typename, fields)
             for line in range(len(converted_data)):
                 if line == 0: continue
+                key_val_map = defaultdict()
+                for key, val in converted_data[line].items():
+                    if key in fields:
+                        key_val_map[key] = val
+                obj = _class_(**key_val_map)
+                result.append(obj)
+            return result
+        else:
+            return func_data
 
-
-        return json_data
-
-    def __convert_data_type(self, data):
+    def __convert_data_type(self,data):
         if type(data) is not list:
             return data
         int_match_str = '|'.join(self.config['response_format']['int'])

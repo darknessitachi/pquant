@@ -293,7 +293,7 @@ def set_filter():
     func_register(g.filter, filter_limitup, '过滤涨停的股票')
     func_register(g.filter, filter_limitdown, '过滤跌停的股票')
     # func_register(g.filter,filter_by_growth_rate, '过滤n日增长率为负的股票')
-    # func_register(g.filter,filter_blacklist, '过滤黑名单股票')
+    func_register(g.filter,filter_blacklist, '过滤黑名单股票')
     # func_register(g.filter,filter_new, '过滤新股')
     func_register(g.filter, filter_by_rank, '评分过滤器')
 
@@ -363,8 +363,6 @@ def pick_stocks(context, data):
     '''
     stock_list = g.cache['stock_list']
 
-    # for key in g.filter.keys():
-    #     stock_list = g.filter[key][g.FUNC](stock_list, context, data)
     for filter in g.filter:
         stock_list = filter[g.FUNC](stock_list, context, data)
 
@@ -375,6 +373,7 @@ def pick_stocks(context, data):
 def filter_by_query(stock_list, context, data):
     '''
     查询财务数据库过滤
+        选择 eps > eps_min 按 股票市值排序 取 pick_stock_count数量的股票
     '''
     pe_min = 0
     pe_max = 200
@@ -459,12 +458,7 @@ def filter_limitup(stock_list, context, data):
     过滤涨停的股票
     '''
     threshold = 1.00
-    # last_prices = history(1, unit='1m', field='close',
-    #                       security_list=stock_list)
-
     # 已存在于持仓的股票即使涨停也不过滤，避免此股票再次可买，但因被过滤而导致选择别的股票
-    # return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
-    #         or last_prices[stock][-1] < data[stock].high_limit * threshold]
     return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
             or data[stock].close < data[stock].high_limit * threshold]
 
@@ -474,11 +468,6 @@ def filter_limitdown(stock_list, context, data):
     过滤跌停的股票
     '''
     threshold = 1.00
-    # last_prices = history(1, unit='1m', field='close',
-    #                       security_list=stock_list)
-
-    # return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
-    #         or last_prices[stock][-1] > data[stock].low_limit * threshold]
     return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
             or data[stock].close > data[stock].low_limit * threshold]
 
@@ -538,8 +527,7 @@ def filter_by_rank(stock_list, context, data):
         # avg_15 = h['close'][-15:].mean()
         # cur_price = get_close_price(stock, 1, '1m')
 
-        score = (cur_price - low_price_130) + \
-                (cur_price - high_price_130) + (cur_price - avg_15)
+        score = (cur_price - low_price_130) + (cur_price - high_price_130) + (cur_price - avg_15)
         # score = ((cur_price-low_price_130) + (cur_price-high_price_130) +
         # (cur_price-avg_15)) / cur_price
         dst_stocks[stock] = score
