@@ -29,12 +29,12 @@ class MainEngine:
 
         # 登录账户
         if (broker is not None) and (account_file is not None):
-            self.user = trade.use(broker,account_file)
+            self.user = trade.use(broker, account_file)
             need_data_file = pathlib.Path(account_file)
             if need_data_file.exists():
                 self.user.login()
             else:
-                self.log.warn("券商账号信息文件 %s 不存在, trader 将不可用" % account_file)
+                self.log.warning("券商账号信息文件 %s 不存在, trader 将不可用" % account_file)
         else:
             self.user = None
             self.log.info('选择了无交易模式')
@@ -54,7 +54,8 @@ class MainEngine:
                 raise ValueError("行情引擎 EventType 重复:" + types)
         self.quotation_engines = []
         for quotation_engine in quotation_engines:
-            self.quotation_engines.append(quotation_engine(event_engine = self.event_engine,clock_engine = self.clock_engine))
+            self.quotation_engines.append(
+                quotation_engine(event_engine=self.event_engine, clock_engine=self.clock_engine))
 
         # 保存读取的策略类
         self.strategies = OrderedDict()
@@ -64,7 +65,7 @@ class MainEngine:
         self.is_watch_strategy = False
         # 修改时间缓存
         self._cache = {}
-        # # 文件进程映射
+        # 文件进程映射
         # self._process_map = {}
         # 文件模块映射
         self._modules = {}
@@ -253,3 +254,4 @@ class MainEngine:
         # 退出
         time.sleep(.1)
         sys.exit(1)
+

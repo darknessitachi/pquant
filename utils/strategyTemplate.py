@@ -44,6 +44,7 @@ class StrategyObject(Object):
 
 StrategyState_instance_count = 0
 
+
 class StrategyState(StrategyObject):
     def __init__(self):
         StrategyObject.__init__(self)
@@ -65,7 +66,7 @@ class StrategyState(StrategyObject):
             try:
                 pickle.dumps(name)
                 pickle.dumps(value)
-            except Exception as  e:
+            except Exception as e:
                 pass
                 # log.error("g.%s 不能通过pickle序列化, 在模拟交易时进程重启后会丢失状态, 请不要把此对象放在 g 中. 序列化时的错误: %s" \
                 #           % (name, e))
@@ -74,10 +75,13 @@ class StrategyState(StrategyObject):
 
     pass
 
+
 g = StrategyState()
+
 
 def get_g():
     return g
+
 
 class StrategyTemplate(StrategyObject):
     name = 'DefaultStrategyTemplate'
