@@ -1,4 +1,4 @@
-'''
+"""
 二八小市值择时买卖
 
 配置指定频率的调仓日，在调仓日每日指定时间，计算所选大盘指数和所选小盘指数当前的20日涨
@@ -21,7 +21,7 @@
 版本：v2.0.7
 日期：2016.11.15
 作者：Morningstar
-'''
+"""
 
 from collections import OrderedDict
 from kuanke.user_space_api import *
