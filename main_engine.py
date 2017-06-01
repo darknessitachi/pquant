@@ -22,7 +22,8 @@ class MainEngine:
     """主引擎，负责行情 / 事件驱动引擎 / 交易"""
 
     def __init__(self, broker=None, account_file=None, quotation_engines=None, tzinfo=None):
-        """初始化事件 / 行情 引擎并启动事件引擎
+        """
+            初始化事件 / 行情 引擎并启动事件引擎
         """
         self.log = logging.getLogger("MainEngine")
         self.broker = broker

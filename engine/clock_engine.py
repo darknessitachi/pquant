@@ -14,7 +14,7 @@ from .event_engine import Event
 class Clock:
     def __init__(self, trading_state, clock_event):
         """
-
+        初始化
         :param trading_state: 是否交易时间
         :param clock_event:
         """
@@ -23,11 +23,13 @@ class Clock:
 
 
 class ClockIntervalHandler:
+    """ 时间间隔时钟处理器 """
     def __init__(self, clock_engine, interval, trading=True, call=None):
         """
+
         :param interval: float(minute)
         :param trading: 在交易阶段才触发
-        :return:
+        :return
         """
         self.clock_engine = clock_engine
         self.clock_type = interval
@@ -101,14 +103,14 @@ class ClockMomentHandler:
 class ClockEngine:
     """
     时间推送引擎
-    1. 提供统一的 now 时间戳.
+    提供统一的 now 时间戳.
     """
     EventType = 'clock_tick'
 
     def __init__(self, event_engine, tzinfo=None):
         """
         :param event_engine:
-        :param event_engine: tzinfo
+        :param tzinfo: tzinfo
         :return:
         """
         # 默认使用当地时间的时区

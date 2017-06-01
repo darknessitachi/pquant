@@ -1,4 +1,4 @@
-'''
+"""
 二八小市值择时买卖
 
 配置指定频率的调仓日，在调仓日每日指定时间，计算所选大盘指数和所选小盘指数当前的20日涨
@@ -21,12 +21,11 @@
 版本：v2.0.7
 日期：2016.11.15
 作者：Morningstar
-'''
+"""
 
-from collections import OrderedDict
 from kuanke.user_space_api import *
 
-class trade_stat():
+class trade_stat:
     def __init__(self):
         self.trade_total_count = 0
         self.trade_success_count = 0
@@ -185,9 +184,9 @@ def after_trading_end(context):
 
 
 def handle_data(context, data):
-    '''
+    """
     按分钟回测
-    '''
+    """
     # for key in g.stop_loss_minute:
     #     g.stop_loss_minute[key][g.FUNC](context, data)
     for stop in g.stop_loss_minute:
@@ -335,9 +334,9 @@ def set_cache():
 
 
 def reset_day_param():
-    '''
+    """
     重置当日参数，仅针对需要当日需要重置的参数
-    '''
+    """
     df = get_fundamentals(query(valuation.code))
     g.cache['stock_list'] = list(df['code'])
     # 重置当日大盘价格止损状态
@@ -358,9 +357,9 @@ def reset_day_param():
 
 
 def pick_stocks(context, data):
-    '''
+    """
     选取指定数目的小市值股票，再进行过滤，最终挑选指定可买数目的股票
-    '''
+    """
     stock_list = g.cache['stock_list']
 
     for filter in g.filter:
@@ -371,10 +370,10 @@ def pick_stocks(context, data):
 
 
 def filter_by_query(stock_list, context, data):
-    '''
+    """
     查询财务数据库过滤
         选择 eps > eps_min 按 股票市值排序 取 pick_stock_count数量的股票
-    '''
+    """
     pe_min = 0
     pe_max = 200
     eps_min = 0
@@ -398,9 +397,9 @@ def filter_by_query(stock_list, context, data):
 
 
 # def filter_by_pe(stock_list, context, data):
-#     '''
+#     """
 #     过滤不在PE范围内股票
-#     '''
+#     """
 #     min=0
 #     max=200
 #     df=get_fundamentals(query(
@@ -414,9 +413,9 @@ def filter_by_query(stock_list, context, data):
 
 
 # def filter_by_eps(stock_list, context, data):
-#     '''
+#     """
 #     过滤不在EPS范围内股票
-#     '''
+#     """
 #     min=0
 #     # max = 200
 #     df=get_fundamentals(query(
@@ -429,17 +428,17 @@ def filter_by_query(stock_list, context, data):
 
 
 def filter_paused(stock_list, context, data):
-    '''
+    """
     过滤停牌股票
-    '''
+    """
     current_data = get_current_data()
     return [stock for stock in stock_list if not current_data[stock].paused]
 
 
 def filter_st(stock_list, context, data):
-    '''
+    """
     过滤ST及其他具有退市标签的股票
-    '''
+    """
     current_data = get_current_data()
     return [stock for stock in stock_list
             if not current_data[stock].is_st
@@ -447,16 +446,16 @@ def filter_st(stock_list, context, data):
 
 
 def filter_gem(stock_list, context, data):
-    '''
+    """
     过滤创业版股票
-    '''
+    """
     return [stock for stock in stock_list if stock[0:3] != '300']
 
 
 def filter_limitup(stock_list, context, data):
-    '''
+    """
     过滤涨停的股票
-    '''
+    """
     threshold = 1.00
     # 已存在于持仓的股票即使涨停也不过滤，避免此股票再次可买，但因被过滤而导致选择别的股票
     return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
@@ -464,26 +463,26 @@ def filter_limitup(stock_list, context, data):
 
 
 def filter_limitdown(stock_list, context, data):
-    '''
+    """
     过滤跌停的股票
-    '''
+    """
     threshold = 1.00
     return [stock for stock in stock_list if stock in context.portfolio.positions.keys()
             or data[stock].close > data[stock].low_limit * threshold]
 
 
 def filter_by_growth_rate(stock_list, context, data):
-    '''
+    """
     过滤n日增长率为负的股票
-    '''
+    """
     n = 20
     return [stock for stock in stock_list if get_growth_rate(stock, n) > 0]
 
 
 def filter_blacklist(stock_list, context, data):
-    '''
+    """
     过滤黑名单股票
-    '''
+    """
     blacklist = _get_blacklist()
     return [stock for stock in stock_list if stock not in blacklist]
 
@@ -500,9 +499,9 @@ def _get_blacklist():
 
 
 def filter_new(stock_list, context, data):
-    '''
+    """
     过滤新股
-    '''
+    """
     delta = 60
     stocks = get_all_securities(['stock'])
     stocks = stocks[(context.current_dt.date() - stocks.start_date)
@@ -510,9 +509,9 @@ def filter_new(stock_list, context, data):
 
 
 def filter_by_rank(stock_list, context, data):
-    '''
+    """
     评分过滤器
-    '''
+    """
     stock_list = stock_list[:g.param['rank_stock_count'][g.VALUE]]
     dst_stocks = {}
     for stock in stock_list:
@@ -542,11 +541,11 @@ def filter_by_rank(stock_list, context, data):
 
 
 def stop_loss_by_price(context, data):
-    '''
+    """
     大盘指数前130日内最高价超过最低价2倍，则清仓止损
     基于历史数据判定，因此若状态满足，则当天都不会变化
     增加此止损，回撤降低，收益降低
-    '''
+    """
     index = g.param['index_price'][g.VALUE]
     if not g.cache['is_day_stop_loss_by_price']:
         h = attribute_history(index, 160, unit='1d', fields=(
@@ -571,12 +570,12 @@ def stop_loss_by_price(context, data):
 
 
 def stop_loss_by_3_crows(context, data):
-    '''
+    """
     前日三黑鸦，累计当日大盘指数涨幅<0的分钟计数
     如果分钟计数超过值n，则开始进行三黑鸦止损
     避免无效三黑鸦乱止损
     minute
-    '''
+    """
     # 配置三黑鸦判定指数，默认为上证指数，可修改为其他指数
     index = g.param['index_3_crows'][g.VALUE]
     # 配置是否开启大盘三黑鸦止损
@@ -635,10 +634,10 @@ def _is_3_crows(stock):
 
 
 def stop_loss_by_index_ls(context, data):
-    '''
+    """
     二八止损
     minute
-    '''
+    """
     count = 120
     # 回看指数前20天的涨幅
     gr_index_l = get_growth_rate(g.param['index_l'][g.VALUE])
@@ -677,10 +676,10 @@ def stop_loss_by_index_ls(context, data):
 
 
 def stop_loss_by_stock(context, data):
-    '''
+    """
     个股止损
     minute 级别
-    '''
+    """
     for stock in context.portfolio.positions.keys():
         cur_price = data[stock].close
 
@@ -699,10 +698,10 @@ def stop_loss_by_stock(context, data):
 
 
 def stop_profit_by_stock(context, data):
-    '''
+    """
     个股止盈
     minute 级别
-    '''
+    """
     for stock in context.portfolio.positions.keys():
         position = context.portfolio.positions[stock]
         cur_price = data[stock].close
@@ -719,12 +718,12 @@ def stop_profit_by_stock(context, data):
 
 
 def _get_stop_loss_threshold(security, n=3):
-    '''
+    """
     计算个股回撤止损阈值
     即个股在持仓n天内能承受的最大跌幅
     算法：(个股250天内最大的n日跌幅 + 个股250天内平均的n日跌幅)/2
     返回正值
-    '''
+    """
     pct_change = _get_pct_change(security, 250, n)
     # log.debug("pct of security [%s]: %s", pct)
     maxd = pct_change.min()
@@ -748,11 +747,11 @@ def _get_stop_loss_threshold(security, n=3):
 
 
 def _get_stop_profit_threshold(security, n=3):
-    '''
+    """
     计算个股止盈阈值
     算法：个股250天内最大的n日涨幅
     返回正值
-    '''
+    """
     pct_change = _get_pct_change(security, 250, n)
     maxr = pct_change.max()
 
@@ -764,10 +763,10 @@ def _get_stop_profit_threshold(security, n=3):
 
 
 def _get_pct_change(security, n, m):
-    '''
+    """
     获取个股前n天的m日增幅值序列
     增加缓存避免当日多次获取数据
-    '''
+    """
     pct_change = None
     if security in g.pct_change.keys():
         pct_change = g.pct_change[security]
@@ -783,11 +782,11 @@ def _get_pct_change(security, n, m):
 
 
 def position_open(security, value):
-    '''
+    """
     开仓，买入指定价值的证券
     报单成功并成交（包括全部成交或部分成交，此时成交量大于0），返回True
     报单失败或者报单成功但被取消（此时成交量等于0），返回False
-    '''
+    """
     order = _order_target_value(security, value)
     if order != None and order.filled > 0:
         # 报单成功并有成交则初始化最高价
@@ -799,11 +798,11 @@ def position_open(security, value):
 
 
 def position_close(position):
-    '''
+    """
     平仓，卖出指定持仓
     平仓成功并全部成交，返回True
     报单失败或者报单成功但被取消（此时成交量等于0），或者报单非全部成交，返回False
-    '''
+    """
     security = position.security
     # order = _order_target_value(security, 0)  # 可能会因停牌失败
     order = _order(security, -position.closeable_amount)  # 卖出可用仓位
@@ -824,9 +823,9 @@ def position_close(position):
 
 
 def position_clear(context):
-    '''
+    """
     清空卖出所有持仓
-    '''
+    """
     if context.portfolio.positions:
         log.info("==> 清仓，卖出所有股票")
         for stock in context.portfolio.positions.keys():
@@ -835,11 +834,11 @@ def position_clear(context):
 
 
 def position_adjust(context, buy_stocks):
-    '''
+    """
     根据待买股票创建或调整仓位
     对于因停牌等原因没有卖出的股票则继续持有
     始终保持持仓数目为g.buy_stock_count
-    '''
+    """
     for stock in context.portfolio.positions.keys():
         if stock not in buy_stocks:
             log.info("stock [%s] in position is not buyable" % (stock))
@@ -863,11 +862,11 @@ def position_adjust(context, buy_stocks):
 
 
 def _order(security, amount):
-    '''
+    """
     自定义下单
     根据Joinquant文档，当前报单函数都是阻塞执行，报单函数（如order_target）返回即表示报单完成
     报单成功返回报单（不代表一定会成交），否则返回None
-    '''
+    """
     if amount < 0:
         log.info("Selling out %s : %f" % (security, -amount))
     elif amount > 0:
@@ -880,11 +879,11 @@ def _order(security, amount):
 
 
 def _order_target_value(security, value):
-    '''
+    """
     自定义下单
     根据Joinquant文档，当前报单函数都是阻塞执行，报单函数（如order_target_value）返回即表示报单完成
     报单成功返回报单（不代表一定会成交），否则返回None
-    '''
+    """
     if value == 0:
         log.info("Selling out %s" % (security))
     else:
@@ -900,9 +899,9 @@ def _order_target_value(security, value):
 
 
 def get_growth_rate(security, n=20):
-    '''
+    """
     获取股票n日以来涨幅，根据当前价计算
-    '''
+    """
     lc = get_close_price(security, n)
     c = get_close_price(security, 1, '1m')
 
@@ -915,9 +914,9 @@ def get_growth_rate(security, n=20):
 
 
 def get_close_price(security, n, unit='1d'):
-    '''
+    """
     获取前n个单位时间当时的收盘价
-    '''
+    """
     close = 0
     while (n > 0):  # 如果前n日数据为nan，则取n-1日数据，直至n为1
         close = attribute_history(security, n, unit, ('close'))['close'][0]
