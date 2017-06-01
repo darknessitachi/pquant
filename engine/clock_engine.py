@@ -14,7 +14,6 @@ from .event_engine import Event
 class Clock:
     def __init__(self, trading_state, clock_event):
         """
-
         :param trading_state: 是否交易时间
         :param clock_event: 时钟事件
         """
@@ -101,7 +100,7 @@ class ClockMomentHandler:
 
     def is_active(self):
         if self.is_trading_date and not etime.is_trade_date(self.clock_engine.now_dt):
-            # 仅在交易日触发时的判断
+            # 仅在交易日触发的判断
             return False
         return self.next_time <= self.clock_engine.now_dt
 
@@ -109,7 +108,7 @@ class ClockMomentHandler:
 class ClockEngine:
     """
     时间推送引擎
-    提供统一的 now 时间戳.
+    1. 提供统一的 now 时间戳.
     """
     EventType = 'clock_tick'
 
@@ -119,7 +118,7 @@ class ClockEngine:
     def __init__(self, event_engine, tzinfo=None):
         """
         :param event_engine:
-        :param event_engine: tzinfo
+        :param tzinfo:
         :return:
         """
         # 默认使用当地时间的时区
